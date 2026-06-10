@@ -361,6 +361,7 @@ export default function TaskGroup({
             <SortableContext items={subGroups.map((sg) => `sg-sort-${sg.id}`)} strategy={verticalListSortingStrategy}>
             {subGroups.map((sg) => {
               const sgTasks = tasks.filter((t) => t.sub_group_id === sg.id)
+              if (hideAddTask && sgTasks.length === 0) return null
               const sgCollapsed = !!collapsedSGs[sg.id]
               return (
                 <div key={sg.id}>

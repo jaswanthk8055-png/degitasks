@@ -358,6 +358,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         .filter((t) => t.group_id === group.id)
         .filter(filterTask)
         .sort((a, b) => a.position - b.position)
+      if (hideAddTask && groupTasks.length === 0) return null
       const groupSubGroups = subGroups
         .filter((sg) => sg.group_id === group.id)
         .sort((a, b) => a.position - b.position)

@@ -125,7 +125,8 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         if (!rule.enabled) continue
         if (rule.trigger.type === 'status_change' && rule.trigger.value === updates.status) {
           if (rule.action.type === 'move_to_group') {
-            await updateTask(taskId, { group_id: rule.action.groupId })
+            // Also clear sub_group_id — sections belong to a specific group and don't transfer
+            await updateTask(taskId, { group_id: rule.action.groupId, sub_group_id: null })
             const groupName = groups.find((g) => g.id === rule.action.groupId)?.name
             if (groupName) addToast(`Moved to "${groupName}"`)
           }
@@ -205,7 +206,8 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       reordered.splice(newIdx, 0, moved)
       await Promise.all(reordered.map((t, i) => updateTask(t.id, { position: i })))
     } else {
-      await updateTask(draggedTask.id, { group_id: overTask.group_id, position: overTask.position })
+      // Clear sub_group_id when dragging across groups — sections don't transfer
+      await updateTask(draggedTask.id, { group_id: overTask.group_id, position: overTask.position, sub_group_id: null })
     }
   }
 

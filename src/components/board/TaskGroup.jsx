@@ -298,9 +298,9 @@ export default function TaskGroup({
                       />
                     ) : (
                       <span
-                        onDoubleClick={canEdit ? () => { setEditingSGId(sg.id); setEditingSGName(sg.name) } : undefined}
+                        onDoubleClick={!isVirtual ? () => { setEditingSGId(sg.id); setEditingSGName(sg.name) } : undefined}
                         className="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 cursor-default select-none truncate"
-                        title={canEdit ? 'Double-click to rename' : undefined}
+                        title={!isVirtual ? 'Double-click to rename' : undefined}
                       >
                         {sg.name}
                       </span>
@@ -308,7 +308,7 @@ export default function TaskGroup({
 
                     <span className="text-[10px] text-gray-400 dark:text-gray-600 flex-shrink-0">{sgTasks.length}</span>
 
-                    {canEdit && (
+                    {!isVirtual && (
                       <button
                         onClick={() => onDeleteSubGroup?.(sg.id)}
                         className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
@@ -359,7 +359,7 @@ export default function TaskGroup({
           </SortableContext>
 
           {/* Add sub-group input */}
-          {canEdit && !isVirtual && addingSubGroup ? (
+          {!isVirtual && addingSubGroup ? (
             <form
               onSubmit={handleAddSubGroup}
               className="flex items-center gap-2 pl-6 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a]"
@@ -377,7 +377,7 @@ export default function TaskGroup({
               <button type="submit" disabled={!newSGName.trim()} className="text-[10px] text-primary-blue font-medium disabled:opacity-40">Add</button>
               <button type="button" onClick={() => { setAddingSubGroup(false); setNewSGName('') }} className="text-[10px] text-gray-400">Cancel</button>
             </form>
-          ) : canEdit && !isVirtual ? (
+          ) : !isVirtual ? (
             <div
               className="flex items-center gap-2 pl-6 pr-3 h-7 hover:bg-gray-50 dark:hover:bg-[#1d1d1d] transition cursor-pointer group/addsg border-b border-border-color dark:border-[#2a2a2a] opacity-0 hover:opacity-100 focus-within:opacity-100"
               style={{ borderLeft: `3px solid ${group.color}` }}

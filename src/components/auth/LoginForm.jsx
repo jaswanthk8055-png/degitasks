@@ -25,7 +25,7 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
           {/* Logo */}
@@ -66,9 +66,12 @@ export default function LoginForm() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <Link to="/forgot-password" className="text-xs text-primary-blue hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 type="password"
                 value={password}

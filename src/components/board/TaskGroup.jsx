@@ -20,6 +20,7 @@ export default function TaskGroup({
   onUpdateTask,
   onDeleteTask,
   onUpdateGroupName,
+  onDeleteGroup,
   onOpenTask,
   colWidths,
   onWidthChange,
@@ -27,14 +28,15 @@ export default function TaskGroup({
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
   const storageKey = `group-collapsed-${group.id}`
-  const [collapsed,    setCollapsed]    = useState(() => localStorage.getItem(storageKey) === 'true')
-  const [editingName,  setEditingName]  = useState(false)
-  const [nameValue,    setNameValue]    = useState(group.name)
-  const [newTaskId,    setNewTaskId]    = useState(null)
-  const [addColModal,  setAddColModal]  = useState(false)
-  const [newColLabel,  setNewColLabel]  = useState('')
-  const [newColType,   setNewColType]   = useState('text')
-  const [savingCol,    setSavingCol]    = useState(false)
+  const [collapsed,       setCollapsed]       = useState(() => localStorage.getItem(storageKey) === 'true')
+  const [editingName,     setEditingName]     = useState(false)
+  const [nameValue,       setNameValue]       = useState(group.name)
+  const [newTaskId,       setNewTaskId]       = useState(null)
+  const [addColModal,     setAddColModal]     = useState(false)
+  const [confirmDelete,   setConfirmDelete]   = useState(false)
+  const [newColLabel,     setNewColLabel]     = useState('')
+  const [newColType,      setNewColType]      = useState('text')
+  const [savingCol,       setSavingCol]       = useState(false)
   const [colContextMenu,  setColContextMenu]  = useState(null)
   const [renamingColId,   setRenamingColId]   = useState(null)
   const [renameValue,     setRenameValue]     = useState('')
@@ -113,7 +115,7 @@ export default function TaskGroup({
   return (
     <div className="mb-2">
       {/* ── Group header ── */}
-      <div className="flex items-stretch" style={{ borderLeft: `3px solid ${group.color}` }}>
+      <div className="flex items-stretch group/grphdr" style={{ borderLeft: `3px solid ${group.color}` }}>
         <div className="flex items-center gap-2 px-3 py-2 flex-1">
           <button onClick={toggleCollapsed} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition">
             <svg
@@ -180,6 +182,19 @@ export default function TaskGroup({
           <span className="text-xs text-gray-400 dark:text-gray-600 ml-1">
             {tasks.length} {tasks.length === 1 ? 'item' : 'items'}
           </span>
+
+          {/* Delete group button — only for real groups, revealed on hover */}
+          {!isVirtual && onDeleteGroup && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="ml-2 opacity-0 group-hover/grphdr:opacity-100 transition-opacity p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              title="Delete group"
+            >
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -239,6 +254,28 @@ export default function TaskGroup({
           </div>
         </div>
       )}
+
+      {/* ── Delete Group Confirmation ── */}
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete group">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+          Delete <span className="font-semibold" style={{ color: group.color }}>{group.name}</span>?
+          This will permanently remove the group and all <span className="font-semibold">{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}</span> inside it.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => setConfirmDelete(false)}
+            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-[#333] dark:text-gray-300 dark:hover:bg-[#3a3a3a] rounded-lg transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { setConfirmDelete(false); onDeleteGroup(group.id) }}
+            className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition"
+          >
+            Delete group
+          </button>
+        </div>
+      </Modal>
 
       {/* ── Add Column Modal ── */}
       <Modal open={addColModal} onClose={() => setAddColModal(false)} title="Add column">

@@ -30,7 +30,7 @@ export default function SignupForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
           {/* Logo */}

@@ -134,6 +134,15 @@ export const useBoardStore = create((set, get) => ({
     }))
   },
 
+  deleteGroup: async (groupId) => {
+    await supabase.from('tasks').delete().eq('group_id', groupId)
+    await supabase.from('groups').delete().eq('id', groupId)
+    set((s) => ({
+      groups: s.groups.filter((g) => g.id !== groupId),
+      tasks:  s.tasks.filter((t) => t.group_id !== groupId),
+    }))
+  },
+
   // ─── Tasks ────────────────────────────────────────────────────────
   createTask: async (boardId, groupId, userId) => {
     const groupTasks = get().tasks.filter((t) => t.group_id === groupId)

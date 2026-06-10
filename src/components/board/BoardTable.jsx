@@ -82,7 +82,7 @@ function buildVirtualGroups(groupBy, tasks, profiles) {
 export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
   const {
     groups, tasks, profiles, boardColumns,
-    createGroup, createTask, updateTask, deleteTask, updateGroupName,
+    createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
     currentBoard, logActivity,
   } = useBoardStore()
   const { profile } = useAuthStore()
@@ -216,6 +216,11 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
     addToast('Task deleted', 'error')
   }
 
+  const handleDeleteGroup = async (groupId) => {
+    await deleteGroup(groupId)
+    addToast('Group deleted', 'error')
+  }
+
   const filterTask = (task) => {
     if (!filters) return true
     if (filters.assigneeIds.length > 0 && !filters.assigneeIds.includes(task.assignee_id)) return false
@@ -278,6 +283,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           onUpdateGroupName={updateGroupName}
+          onDeleteGroup={handleDeleteGroup}
           onOpenTask={onOpenTask}
           colWidths={colWidths}
           onWidthChange={handleWidthChange}

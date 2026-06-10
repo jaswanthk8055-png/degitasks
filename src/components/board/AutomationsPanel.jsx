@@ -1,45 +1,27 @@
 import { useState, useEffect } from 'react'
 import { useBoardStore } from '../../stores/useBoardStore'
-import { STATUS_OPTIONS } from '../../lib/utils'
 import Modal from '../ui/Modal'
 
-function loadAutomations(boardId) {
-  try {
-    const raw = localStorage.getItem(`board-automations-${boardId}`)
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
-function saveAutomations(boardId, list) {
-  try { localStorage.setItem(`board-automations-${boardId}`, JSON.stringify(list)) } catch {}
-}
-
-export { loadAutomations }
-
 export default function AutomationsPanel({ open, onClose }) {
-  const { currentBoard, groups } = useBoardStore()
+  const { currentBoard, groups, statusOptions, automations, updateAutomations } = useBoardStore()
   const boardId = currentBoard?.id
 
-  const [automations, setAutomations] = useState([])
-  const [creating,    setCreating]    = useState(false)
-  const [newTrigger,  setNewTrigger]  = useState(STATUS_OPTIONS[2].label) // 'Done'
-  const [newGroupId,  setNewGroupId]  = useState('')
+  const [creating,   setCreating]   = useState(false)
+  const [newTrigger, setNewTrigger] = useState('')
+  const [newGroupId, setNewGroupId] = useState('')
 
   useEffect(() => {
-    if (boardId) setAutomations(loadAutomations(boardId))
-  }, [boardId, open])
+    if (statusOptions.length > 0 && !newTrigger) setNewTrigger(statusOptions[0]?.label || '')
+  }, [statusOptions])
 
   useEffect(() => {
     if (groups.length > 0 && !newGroupId) setNewGroupId(groups[0].id)
   }, [groups])
 
-  const persist = (list) => {
-    setAutomations(list)
-    saveAutomations(boardId, list)
-  }
+  const persist = (list) => updateAutomations(boardId, list)
 
   const handleAdd = () => {
-    if (!newGroupId) return
+    if (!newGroupId || !newTrigger) return
     const rule = {
       id: crypto.randomUUID(),
       enabled: true,
@@ -65,7 +47,6 @@ export default function AutomationsPanel({ open, onClose }) {
           Automatically perform actions when conditions are met on this board.
         </p>
 
-        {/* Existing rules */}
         {automations.length === 0 && !creating && (
           <div className="py-8 text-center text-sm text-gray-400">
             No automations yet. Create one below.
@@ -84,7 +65,6 @@ export default function AutomationsPanel({ open, onClose }) {
                   : 'border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#1e1e1e] opacity-60'
               }`}
             >
-              {/* Rule text */}
               <div className="flex-1 min-w-0">
                 <span className="text-xs text-gray-700 dark:text-gray-300">
                   When status changes to{' '}
@@ -94,7 +74,6 @@ export default function AutomationsPanel({ open, onClose }) {
                 </span>
               </div>
 
-              {/* Toggle */}
               <button
                 onClick={() => toggleEnabled(rule.id)}
                 title={rule.enabled ? 'Disable' : 'Enable'}
@@ -109,7 +88,6 @@ export default function AutomationsPanel({ open, onClose }) {
                 />
               </button>
 
-              {/* Delete */}
               <button
                 onClick={() => deleteRule(rule.id)}
                 className="text-gray-300 hover:text-red-400 transition flex-shrink-0"
@@ -123,7 +101,6 @@ export default function AutomationsPanel({ open, onClose }) {
           )
         })}
 
-        {/* Create form */}
         {creating ? (
           <div className="border border-gray-200 dark:border-[#444] rounded-lg p-3 space-y-3 bg-gray-50 dark:bg-[#1e1e1e]">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">New automation</p>
@@ -134,7 +111,7 @@ export default function AutomationsPanel({ open, onClose }) {
                 onChange={(e) => setNewTrigger(e.target.value)}
                 className="flex-1 min-w-[120px] px-2 py-1 text-sm border border-gray-300 dark:border-[#444] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue bg-white dark:bg-[#252525] dark:text-white"
               >
-                {STATUS_OPTIONS.map((s) => (
+                {statusOptions.map((s) => (
                   <option key={s.label} value={s.label}>{s.label}</option>
                 ))}
               </select>
@@ -158,7 +135,7 @@ export default function AutomationsPanel({ open, onClose }) {
               </button>
               <button
                 onClick={handleAdd}
-                disabled={!newGroupId}
+                disabled={!newGroupId || !newTrigger}
                 className="px-3 py-1.5 text-xs text-white bg-primary-blue hover:bg-blue-600 rounded-lg transition disabled:opacity-50"
               >
                 Add rule

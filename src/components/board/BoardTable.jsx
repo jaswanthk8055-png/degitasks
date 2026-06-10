@@ -17,7 +17,6 @@ import { useToastStore } from '../../stores/useToastStore'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, avatarColorFromName } from '../../lib/utils'
 import TaskGroup from './TaskGroup'
 import TaskRow from './TaskRow'
-import { loadAutomations } from './AutomationsPanel'
 
 
 // Default pixel widths for fixed columns
@@ -81,7 +80,7 @@ function buildVirtualGroups(groupBy, tasks, profiles) {
 
 export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false }) {
   const {
-    groups, tasks, profiles, boardColumns,
+    groups, tasks, profiles, boardColumns, automations,
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
     currentBoard, logActivity,
   } = useBoardStore()
@@ -121,7 +120,6 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       addToast(`Status → "${updates.status}"`)
 
       // Run automations for status changes
-      const automations = loadAutomations(boardId)
       for (const rule of automations) {
         if (!rule.enabled) continue
         if (rule.trigger.type === 'status_change' && rule.trigger.value === updates.status) {

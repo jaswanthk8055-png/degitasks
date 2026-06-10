@@ -2,6 +2,13 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { randomGroupColor, loadStatusOptions, saveStatusOptionsToStorage } from '../lib/utils'
 
+function loadAutomationsCache(boardId) {
+  try { return JSON.parse(localStorage.getItem(`board-automations-${boardId}`) || '[]') } catch { return [] }
+}
+function saveAutomationsCache(boardId, list) {
+  try { localStorage.setItem(`board-automations-${boardId}`, JSON.stringify(list)) } catch {}
+}
+
 export const useBoardStore = create((set, get) => ({
   boards: [],
   currentBoard: null,
@@ -11,6 +18,7 @@ export const useBoardStore = create((set, get) => ({
   boardColumns: [],
   taskColumnValues: {},    // { taskId: { columnId: value, ... }, ... }
   statusOptions: [],
+  automations: [],
   workspaceId: null,
   realtimeConnected: false,
   loading: false,
@@ -66,14 +74,23 @@ export const useBoardStore = create((set, get) => ({
   },
 
   updateStatusOptions: async (boardId, options) => {
-    // Save to Supabase so all users see the same options
     await supabase.from('boards').update({ status_options: options }).eq('id', boardId)
-    // Also cache locally as fallback
     saveStatusOptionsToStorage(boardId, options)
     set((s) => ({
       statusOptions: options,
       currentBoard: s.currentBoard?.id === boardId
         ? { ...s.currentBoard, status_options: options }
+        : s.currentBoard,
+    }))
+  },
+
+  updateAutomations: async (boardId, list) => {
+    await supabase.from('boards').update({ automations: list }).eq('id', boardId)
+    saveAutomationsCache(boardId, list)
+    set((s) => ({
+      automations: list,
+      currentBoard: s.currentBoard?.id === boardId
+        ? { ...s.currentBoard, automations: list }
         : s.currentBoard,
     }))
   },
@@ -111,6 +128,10 @@ export const useBoardStore = create((set, get) => ({
     const dbStatusOptions = boardRes.data?.status_options
     const statusOptions = dbStatusOptions || loadStatusOptions(boardId)
 
+    // Automations: prefer DB value, fall back to localStorage cache
+    const dbAutomations = boardRes.data?.automations
+    const automations = dbAutomations || loadAutomationsCache(boardId)
+
     set({
       currentBoard: boardRes.data,
       groups: groupsRes.data || [],
@@ -119,6 +140,7 @@ export const useBoardStore = create((set, get) => ({
       boardColumns: columnsRes.data || [],
       taskColumnValues,
       statusOptions,
+      automations,
       loading: false,
     })
   },

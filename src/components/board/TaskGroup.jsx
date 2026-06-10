@@ -234,8 +234,8 @@ export default function TaskGroup({
             ))}
           </SortableContext>
 
-          {/* Add task — only for super user */}
-          {canEdit && (
+          {/* Add task — all users can create tasks (not in virtual groups) */}
+          {!isVirtual && (
             <div
               className="flex items-center gap-2 px-4 h-9 hover:bg-row-hover dark:hover:bg-[#252525] transition cursor-pointer group/add border-b border-border-color dark:border-[#333]"
               style={{ borderLeft: `3px solid ${group.color}` }}

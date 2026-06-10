@@ -20,10 +20,13 @@ export default function TaskRow({
   extraColumns = [],
   colWidths = COL_DEFAULTS,
 }) {
-  const inputRef = useRef(null)
+  const titleInputRef = useRef(null)
   const { taskColumnValues, updateColumnValue } = useBoardStore()
   const { user } = useAuthStore()
   const canEdit = user?.email === SUPER_USER_EMAIL
+
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState(task.title || '')
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
@@ -35,8 +38,28 @@ export default function TaskRow({
   }
 
   useEffect(() => {
-    if (autoFocus && inputRef.current) inputRef.current.focus()
+    if (autoFocus) { setEditingTitle(true) }
   }, [autoFocus])
+
+  useEffect(() => {
+    if (editingTitle && titleInputRef.current) titleInputRef.current.focus()
+  }, [editingTitle])
+
+  // Keep local title in sync if task updates from realtime
+  useEffect(() => {
+    if (!editingTitle) setTitleValue(task.title || '')
+  }, [task.title, editingTitle])
+
+  const commitTitle = () => {
+    setEditingTitle(false)
+    const trimmed = titleValue.trim()
+    if (trimmed !== task.title) onUpdate(task.id, { title: trimmed || task.title })
+  }
+
+  const handleTitleKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commitTitle() }
+    if (e.key === 'Escape') { setTitleValue(task.title || ''); setEditingTitle(false) }
+  }
 
   const colValues = taskColumnValues[task.id] || {}
 
@@ -75,19 +98,39 @@ export default function TaskRow({
         <input type="checkbox" className="w-3 h-3 cursor-pointer accent-primary-blue" />
       </div>
 
-      {/* Task title — fixed width matching the header */}
+      {/* Task title — click to edit inline; click ">" to open detail panel */}
       <div
-        className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] cursor-pointer overflow-hidden"
+        className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] overflow-hidden"
         style={{ width: colWidths.title ?? COL_DEFAULTS.title }}
-        onClick={() => onOpenDetail?.(task)}
       >
-        <span className="text-sm text-gray-900 dark:text-gray-100 hover:text-primary-blue transition truncate w-full">
-          {task.title || <span className="text-gray-400 dark:text-gray-600 italic text-xs">Click to name</span>}
-        </span>
-        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          className="flex-shrink-0 ml-1 text-gray-300 opacity-0 group-hover/row:opacity-100 transition">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
+        {editingTitle ? (
+          <input
+            ref={titleInputRef}
+            value={titleValue}
+            onChange={(e) => setTitleValue(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={handleTitleKeyDown}
+            className="flex-1 min-w-0 text-sm bg-transparent outline-none border-b border-primary-blue text-gray-900 dark:text-gray-100 py-0.5"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            className="flex-1 min-w-0 text-sm text-gray-900 dark:text-gray-100 hover:text-primary-blue transition truncate cursor-text"
+            onClick={() => setEditingTitle(true)}
+          >
+            {task.title || <span className="text-gray-400 dark:text-gray-600 italic text-xs">Click to name</span>}
+          </span>
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task) }}
+          className="flex-shrink-0 ml-1 text-gray-300 hover:text-primary-blue opacity-0 group-hover/row:opacity-100 transition p-0.5 rounded"
+          title="Open details"
+          tabIndex={-1}
+        >
+          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
       {/* Status */}

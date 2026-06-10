@@ -74,7 +74,8 @@ export const useBoardStore = create((set, get) => ({
   },
 
   updateStatusOptions: async (boardId, options) => {
-    await supabase.from('boards').update({ status_options: options }).eq('id', boardId)
+    const { error } = await supabase.from('boards').update({ status_options: options }).eq('id', boardId)
+    if (error) console.error('[DegiTasks] Failed to save status_options:', error)
     saveStatusOptionsToStorage(boardId, options)
     set((s) => ({
       statusOptions: options,
@@ -85,7 +86,8 @@ export const useBoardStore = create((set, get) => ({
   },
 
   updateAutomations: async (boardId, list) => {
-    await supabase.from('boards').update({ automations: list }).eq('id', boardId)
+    const { error } = await supabase.from('boards').update({ automations: list }).eq('id', boardId)
+    if (error) console.error('[DegiTasks] Failed to save automations:', error)
     saveAutomationsCache(boardId, list)
     set((s) => ({
       automations: list,
@@ -330,6 +332,13 @@ export const useBoardStore = create((set, get) => ({
         if (eventType === 'DELETE') {
           return { boardColumns: s.boardColumns.filter((c) => c.id !== oldRecord.id) }
         }
+      }
+      if (table === 'boards' && eventType === 'UPDATE') {
+        const updates = {}
+        if (newRecord.status_options) updates.statusOptions = newRecord.status_options
+        if (newRecord.automations)    updates.automations   = newRecord.automations
+        if (newRecord.name !== undefined) updates.currentBoard = { ...s.currentBoard, ...newRecord }
+        return updates
       }
       return {}
     })

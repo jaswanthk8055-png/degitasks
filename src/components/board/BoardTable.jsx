@@ -10,11 +10,13 @@ import {
   DragOverlay,
 } from '@dnd-kit/core'
 
-// Prioritise section-header droppables when the pointer is directly over them,
-// fall back to closestCenter for normal task-to-task reordering.
 function collisionDetectionStrategy(args) {
+  const activeId = String(args.active.id)
+  // Sections reordering: plain closestCenter among all registered droppables
+  if (activeId.startsWith('sg-sort-')) return closestCenter(args)
+  // Task drag: if the pointer is directly over a section header, snap to it
   const pointerHits = pointerWithin(args)
-  const sectionHits = pointerHits.filter((c) => String(c.id).startsWith('sg-drop-'))
+  const sectionHits = pointerHits.filter((c) => String(c.id).startsWith('sg-sort-'))
   if (sectionHits.length > 0) return sectionHits
   return closestCenter(args)
 }
@@ -191,17 +193,41 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
 
   const handleDragEnd = async ({ active, over }) => {
     setActiveTask(null)
-    if (!canEdit || !over || active.id === over.id) return
+    if (!over || active.id === over.id) return
+
+    const activeIdStr = String(active.id)
+    const overIdStr   = String(over.id)
+
+    // ── Section reordering (available to all users) ───────────────────
+    if (activeIdStr.startsWith('sg-sort-')) {
+      if (!overIdStr.startsWith('sg-sort-')) return
+      const activeSgId = activeIdStr.slice('sg-sort-'.length)
+      const overSgId   = overIdStr.slice('sg-sort-'.length)
+      const activeSg   = subGroups.find((sg) => sg.id === activeSgId)
+      const overSg     = subGroups.find((sg) => sg.id === overSgId)
+      if (!activeSg || !overSg || activeSg.group_id !== overSg.group_id) return
+      const groupSGs = subGroups
+        .filter((sg) => sg.group_id === activeSg.group_id)
+        .sort((a, b) => a.position - b.position)
+      const oldIdx = groupSGs.findIndex((sg) => sg.id === activeSgId)
+      const newIdx = groupSGs.findIndex((sg) => sg.id === overSgId)
+      const reordered = [...groupSGs]
+      const [moved] = reordered.splice(oldIdx, 1)
+      reordered.splice(newIdx, 0, moved)
+      await Promise.all(reordered.map((sg, i) => updateSubGroup(sg.id, { position: i })))
+      return
+    }
+
+    // ── Task moves (super user only) ──────────────────────────────────
+    if (!canEdit) return
     const draggedTask = tasks.find((t) => t.id === active.id)
     if (!draggedTask) return
 
-    // Dropped onto a section header droppable
-    const overIdStr = String(over.id)
-    if (overIdStr.startsWith('sg-drop-')) {
-      const targetSgId = overIdStr.slice('sg-drop-'.length)
+    // Dropped onto a section header
+    if (overIdStr.startsWith('sg-sort-')) {
+      const targetSgId = overIdStr.slice('sg-sort-'.length)
       const targetSg = subGroups.find((sg) => sg.id === targetSgId)
       if (!targetSg) return
-      // Nothing to do if already in this section
       if (draggedTask.sub_group_id === targetSgId && draggedTask.group_id === targetSg.group_id) return
       const updates = { sub_group_id: targetSgId }
       if (draggedTask.group_id !== targetSg.group_id) updates.group_id = targetSg.group_id

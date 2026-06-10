@@ -1,11 +1,103 @@
 import { useState, useRef, useEffect } from 'react'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { useDroppable } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { useDndContext } from '@dnd-kit/core'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { GROUP_COLORS } from '../../lib/utils'
 import TaskRow from './TaskRow'
 import Modal from '../ui/Modal'
+
+// Module-level so React never remounts it when TaskGroup re-renders (fixes rename losing focus)
+function SubGroupDropHeader({
+  sg, sgTasks, sgCollapsed, groupColor, isVirtual,
+  onToggle, onDelete,
+  editingSGId, editingSGName,
+  onEditStart, onEditChange, onEditCommit, onEditCancel,
+}) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: `sg-sort-${sg.id}` })
+  const { over, active } = useDndContext()
+  const isHovered = over?.id === `sg-sort-${sg.id}`
+  const isTaskOver = isHovered && !String(active?.id ?? '').startsWith('sg-sort-')
+
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    borderLeft: `3px solid ${groupColor}`,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-1 pl-2 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a] group/sghdr transition-colors ${
+        isTaskOver && !isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-50 dark:bg-[#1d1d1d]'
+      }`}
+    >
+      {!isVirtual && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none p-0.5"
+          title="Drag to reorder section"
+          tabIndex={-1}
+        >
+          <svg width="9" height="12" viewBox="0 0 9 14" fill="currentColor">
+            <circle cx="2.5" cy="2"  r="1.2" /><circle cx="6.5" cy="2"  r="1.2" />
+            <circle cx="2.5" cy="7"  r="1.2" /><circle cx="6.5" cy="7"  r="1.2" />
+            <circle cx="2.5" cy="12" r="1.2" /><circle cx="6.5" cy="12" r="1.2" />
+          </svg>
+        </button>
+      )}
+
+      <button onClick={() => onToggle(sg.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
+        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+          className={`transition-transform duration-150 ${sgCollapsed ? '-rotate-90' : ''}`}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-60 ml-0.5" style={{ backgroundColor: groupColor }} />
+
+      {editingSGId === sg.id ? (
+        <input
+          autoFocus
+          value={editingSGName}
+          onChange={(e) => onEditChange(e.target.value)}
+          onBlur={onEditCommit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onEditCommit()
+            if (e.key === 'Escape') onEditCancel()
+          }}
+          className="text-xs font-semibold border-b border-primary-blue outline-none bg-transparent text-gray-700 dark:text-gray-200 flex-1 ml-1"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span
+          onDoubleClick={!isVirtual ? () => onEditStart(sg.id, sg.name) : undefined}
+          className="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 cursor-default select-none truncate ml-1"
+          title={isTaskOver ? 'Drop here to move into this section' : (!isVirtual ? 'Double-click to rename' : undefined)}
+        >
+          {sg.name}
+          {isTaskOver && !isDragging && <span className="ml-1 text-blue-500 text-[10px]">← drop here</span>}
+        </span>
+      )}
+
+      <span className="text-[10px] text-gray-400 dark:text-gray-600 flex-shrink-0">{sgTasks.length}</span>
+
+      {!isVirtual && (
+        <button
+          onClick={() => onDelete?.(sg.id)}
+          className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
+          title="Delete section"
+        >
+          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+}
 
 const COLUMN_TYPES = [
   { type: 'text',     label: 'Text',     icon: 'T' },
@@ -119,68 +211,6 @@ export default function TaskGroup({
   }
 
   const ungroupedTasks = tasks.filter((t) => !t.sub_group_id)
-
-  // Inner component so useDroppable can be called per-section (hooks need stable call order)
-  function SubGroupDropHeader({ sg, sgTasks, sgCollapsed, groupColor, isVirtual: _isVirtual, onToggle, onDelete }) {
-    const { setNodeRef, isOver } = useDroppable({ id: `sg-drop-${sg.id}` })
-    return (
-      <div
-        ref={setNodeRef}
-        className={`flex items-center gap-1.5 pl-6 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a] group/sghdr transition-colors ${
-          isOver
-            ? 'bg-blue-50 dark:bg-blue-900/30'
-            : 'bg-gray-50 dark:bg-[#1d1d1d]'
-        }`}
-        style={{ borderLeft: `3px solid ${groupColor}` }}
-      >
-        <button onClick={() => onToggle(sg.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
-          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-            className={`transition-transform duration-150 ${sgCollapsed ? '-rotate-90' : ''}`}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-60" style={{ backgroundColor: groupColor }} />
-
-        {editingSGId === sg.id ? (
-          <input
-            autoFocus
-            value={editingSGName}
-            onChange={(e) => setEditingSGName(e.target.value)}
-            onBlur={() => commitSGName(sg)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitSGName(sg)
-              if (e.key === 'Escape') setEditingSGId(null)
-            }}
-            className="text-xs font-semibold border-b border-primary-blue outline-none bg-transparent text-gray-700 dark:text-gray-200 flex-1"
-            onClick={(e) => e.stopPropagation()}
-          />
-        ) : (
-          <span
-            onDoubleClick={!_isVirtual ? () => { setEditingSGId(sg.id); setEditingSGName(sg.name) } : undefined}
-            className="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 cursor-default select-none truncate"
-            title={isOver ? 'Drop here to move into this section' : (!_isVirtual ? 'Double-click to rename' : undefined)}
-          >
-            {sg.name}
-            {isOver && <span className="ml-1 text-blue-500 text-[10px]">← drop here</span>}
-          </span>
-        )}
-
-        <span className="text-[10px] text-gray-400 dark:text-gray-600 flex-shrink-0">{sgTasks.length}</span>
-
-        {!_isVirtual && (
-          <button
-            onClick={() => onDelete?.(sg.id)}
-            className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
-            title="Delete section"
-          >
-            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
-    )
-  }
 
   const handleAddColumn = async (e) => {
     e.preventDefault()
@@ -327,7 +357,8 @@ export default function TaskGroup({
               />
             ))}
 
-            {/* Sub-group sections */}
+            {/* Sub-group sections — sortable so they can be reordered by drag */}
+            <SortableContext items={subGroups.map((sg) => `sg-sort-${sg.id}`)} strategy={verticalListSortingStrategy}>
             {subGroups.map((sg) => {
               const sgTasks = tasks.filter((t) => t.sub_group_id === sg.id)
               const sgCollapsed = !!collapsedSGs[sg.id]
@@ -342,6 +373,12 @@ export default function TaskGroup({
                     isVirtual={isVirtual}
                     onToggle={toggleSG}
                     onDelete={onDeleteSubGroup}
+                    editingSGId={editingSGId}
+                    editingSGName={editingSGName}
+                    onEditStart={(id, name) => { setEditingSGId(id); setEditingSGName(name) }}
+                    onEditChange={(val) => setEditingSGName(val)}
+                    onEditCommit={() => commitSGName(sg)}
+                    onEditCancel={() => setEditingSGId(null)}
                   />
 
                   {/* Sub-group tasks */}
@@ -379,6 +416,7 @@ export default function TaskGroup({
                 </div>
               )
             })}
+            </SortableContext>
           </SortableContext>
 
           {/* Add sub-group input */}

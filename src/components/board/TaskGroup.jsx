@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { GROUP_COLORS } from '../../lib/utils'
@@ -118,6 +119,68 @@ export default function TaskGroup({
   }
 
   const ungroupedTasks = tasks.filter((t) => !t.sub_group_id)
+
+  // Inner component so useDroppable can be called per-section (hooks need stable call order)
+  function SubGroupDropHeader({ sg, sgTasks, sgCollapsed, groupColor, isVirtual: _isVirtual, onToggle, onDelete }) {
+    const { setNodeRef, isOver } = useDroppable({ id: `sg-drop-${sg.id}` })
+    return (
+      <div
+        ref={setNodeRef}
+        className={`flex items-center gap-1.5 pl-6 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a] group/sghdr transition-colors ${
+          isOver
+            ? 'bg-blue-50 dark:bg-blue-900/30'
+            : 'bg-gray-50 dark:bg-[#1d1d1d]'
+        }`}
+        style={{ borderLeft: `3px solid ${groupColor}` }}
+      >
+        <button onClick={() => onToggle(sg.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
+          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+            className={`transition-transform duration-150 ${sgCollapsed ? '-rotate-90' : ''}`}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-60" style={{ backgroundColor: groupColor }} />
+
+        {editingSGId === sg.id ? (
+          <input
+            autoFocus
+            value={editingSGName}
+            onChange={(e) => setEditingSGName(e.target.value)}
+            onBlur={() => commitSGName(sg)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitSGName(sg)
+              if (e.key === 'Escape') setEditingSGId(null)
+            }}
+            className="text-xs font-semibold border-b border-primary-blue outline-none bg-transparent text-gray-700 dark:text-gray-200 flex-1"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            onDoubleClick={!_isVirtual ? () => { setEditingSGId(sg.id); setEditingSGName(sg.name) } : undefined}
+            className="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 cursor-default select-none truncate"
+            title={isOver ? 'Drop here to move into this section' : (!_isVirtual ? 'Double-click to rename' : undefined)}
+          >
+            {sg.name}
+            {isOver && <span className="ml-1 text-blue-500 text-[10px]">← drop here</span>}
+          </span>
+        )}
+
+        <span className="text-[10px] text-gray-400 dark:text-gray-600 flex-shrink-0">{sgTasks.length}</span>
+
+        {!_isVirtual && (
+          <button
+            onClick={() => onDelete?.(sg.id)}
+            className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
+            title="Delete section"
+          >
+            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    )
+  }
 
   const handleAddColumn = async (e) => {
     e.preventDefault()
@@ -270,56 +333,16 @@ export default function TaskGroup({
               const sgCollapsed = !!collapsedSGs[sg.id]
               return (
                 <div key={sg.id}>
-                  {/* Sub-group header */}
-                  <div
-                    className="flex items-center gap-1.5 pl-6 pr-3 h-8 bg-gray-50 dark:bg-[#1d1d1d] border-b border-border-color dark:border-[#2a2a2a] group/sghdr"
-                    style={{ borderLeft: `3px solid ${group.color}` }}
-                  >
-                    <button onClick={() => toggleSG(sg.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-                        className={`transition-transform duration-150 ${sgCollapsed ? '-rotate-90' : ''}`}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-60" style={{ backgroundColor: group.color }} />
-
-                    {editingSGId === sg.id ? (
-                      <input
-                        autoFocus
-                        value={editingSGName}
-                        onChange={(e) => setEditingSGName(e.target.value)}
-                        onBlur={() => commitSGName(sg)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitSGName(sg)
-                          if (e.key === 'Escape') setEditingSGId(null)
-                        }}
-                        className="text-xs font-semibold border-b border-primary-blue outline-none bg-transparent text-gray-700 dark:text-gray-200 flex-1"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span
-                        onDoubleClick={!isVirtual ? () => { setEditingSGId(sg.id); setEditingSGName(sg.name) } : undefined}
-                        className="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 cursor-default select-none truncate"
-                        title={!isVirtual ? 'Double-click to rename' : undefined}
-                      >
-                        {sg.name}
-                      </span>
-                    )}
-
-                    <span className="text-[10px] text-gray-400 dark:text-gray-600 flex-shrink-0">{sgTasks.length}</span>
-
-                    {!isVirtual && (
-                      <button
-                        onClick={() => onDeleteSubGroup?.(sg.id)}
-                        className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
-                        title="Delete section"
-                      >
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                  {/* Sub-group header — droppable target */}
+                  <SubGroupDropHeader
+                    sg={sg}
+                    sgTasks={sgTasks}
+                    sgCollapsed={sgCollapsed}
+                    groupColor={group.color}
+                    isVirtual={isVirtual}
+                    onToggle={toggleSG}
+                    onDelete={onDeleteSubGroup}
+                  />
 
                   {/* Sub-group tasks */}
                   {!sgCollapsed && (

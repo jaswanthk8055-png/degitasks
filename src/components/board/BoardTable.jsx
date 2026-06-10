@@ -2,12 +2,22 @@ import { useState, useCallback, useRef } from 'react'
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragOverlay,
 } from '@dnd-kit/core'
+
+// Prioritise section-header droppables when the pointer is directly over them,
+// fall back to closestCenter for normal task-to-task reordering.
+function collisionDetectionStrategy(args) {
+  const pointerHits = pointerWithin(args)
+  const sectionHits = pointerHits.filter((c) => String(c.id).startsWith('sg-drop-'))
+  if (sectionHits.length > 0) return sectionHits
+  return closestCenter(args)
+}
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { isThisWeek, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
@@ -183,8 +193,24 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     setActiveTask(null)
     if (!canEdit || !over || active.id === over.id) return
     const draggedTask = tasks.find((t) => t.id === active.id)
-    const overTask    = tasks.find((t) => t.id === over.id)
-    if (!draggedTask || !overTask) return
+    if (!draggedTask) return
+
+    // Dropped onto a section header droppable
+    const overIdStr = String(over.id)
+    if (overIdStr.startsWith('sg-drop-')) {
+      const targetSgId = overIdStr.slice('sg-drop-'.length)
+      const targetSg = subGroups.find((sg) => sg.id === targetSgId)
+      if (!targetSg) return
+      // Nothing to do if already in this section
+      if (draggedTask.sub_group_id === targetSgId && draggedTask.group_id === targetSg.group_id) return
+      const updates = { sub_group_id: targetSgId }
+      if (draggedTask.group_id !== targetSg.group_id) updates.group_id = targetSg.group_id
+      await updateTask(draggedTask.id, updates)
+      return
+    }
+
+    const overTask = tasks.find((t) => t.id === over.id)
+    if (!overTask) return
 
     if (groupBy !== 'group') {
       const getVKey = (task) => {
@@ -336,7 +362,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetectionStrategy}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >

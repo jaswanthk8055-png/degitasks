@@ -1,15 +1,19 @@
-import { useState, useRef } from 'react'
+import { useRef } from 'react'
 import { format, parseISO } from 'date-fns'
-import Dropdown from '../ui/Dropdown'
 import { formatDueDate } from '../../lib/utils'
 
 export default function DatePicker({ dueDate, taskId, onUpdate }) {
-  const [open, setOpen] = useState(false)
-  const btnRef = useRef(null)
+  const inputRef = useRef(null)
 
   const handleChange = (e) => {
-    setOpen(false)
     onUpdate(taskId, { due_date: e.target.value || null })
+  }
+
+  const openPicker = () => {
+    const el = inputRef.current
+    if (!el) return
+    if (el.showPicker) { try { el.showPicker() } catch { el.click() } }
+    else el.click()
   }
 
   const displayDate = formatDueDate(dueDate)
@@ -17,9 +21,18 @@ export default function DatePicker({ dueDate, taskId, onUpdate }) {
 
   return (
     <div className="relative flex items-center h-full">
+      {/* Hidden native date input — triggers the OS date picker */}
+      <input
+        ref={inputRef}
+        type="date"
+        value={dueDate ? format(parseISO(dueDate), 'yyyy-MM-dd') : ''}
+        onChange={handleChange}
+        className="sr-only"
+        tabIndex={-1}
+      />
+
       <button
-        ref={btnRef}
-        onClick={() => setOpen((p) => !p)}
+        onClick={openPicker}
         className={`px-1.5 py-0.5 rounded text-xs transition hover:bg-gray-100 dark:hover:bg-white/10 focus:outline-none ${
           isOverdue ? 'text-status-red font-medium' : displayDate ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400'
         }`}
@@ -27,26 +40,18 @@ export default function DatePicker({ dueDate, taskId, onUpdate }) {
         {displayDate || '—'}
       </button>
 
-      <Dropdown open={open} onClose={() => setOpen(false)} className="w-auto" anchorRef={btnRef}>
-        <div className="p-3">
-          <p className="text-xs font-medium text-gray-500 mb-2">Due date</p>
-          <input
-            type="date"
-            defaultValue={dueDate ? format(parseISO(dueDate), 'yyyy-MM-dd') : ''}
-            onChange={handleChange}
-            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-[#444] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-blue dark:bg-[#333] dark:text-white"
-          />
-          {dueDate && (
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setOpen(false); onUpdate(taskId, { due_date: null }) }}
-              className="mt-2 w-full text-xs text-red-500 hover:text-red-700 text-left transition"
-            >
-              Clear date
-            </button>
-          )}
-        </div>
-      </Dropdown>
+      {dueDate && (
+        <button
+          onClick={() => onUpdate(taskId, { due_date: null })}
+          className="ml-0.5 text-gray-300 hover:text-red-400 opacity-0 group-hover/row:opacity-100 transition"
+          title="Clear date"
+          tabIndex={-1}
+        >
+          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
     </div>
   )
 }

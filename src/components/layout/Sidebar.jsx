@@ -18,6 +18,14 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
   const { dark, toggle: toggleTheme } = useThemeStore()
   const navigate = useNavigate()
 
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true')
+
+  const toggleCollapsed = () => {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem('sidebar-collapsed', String(next))
+  }
+
   const [newBoardModal, setNewBoardModal] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
   const [newBoardIcon, setNewBoardIcon] = useState('📋')
@@ -131,9 +139,9 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
 
   return (
     <>
-      <aside className="w-60 flex-shrink-0 bg-sidebar-bg flex flex-col h-full overflow-hidden">
-        {/* Logo */}
-        <div className="px-4 py-4 flex items-center gap-2.5">
+      <aside className={`flex-shrink-0 bg-sidebar-bg flex flex-col h-full overflow-hidden transition-all duration-200 ${collapsed ? 'w-14' : 'w-60'}`}>
+        {/* Logo + collapse toggle */}
+        <div className="px-3 py-4 flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-primary-blue flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="7" height="7" rx="1.5" fill="white" />
@@ -142,19 +150,27 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
               <rect x="14" y="14" width="7" height="7" rx="1.5" fill="white" opacity="0.5" />
             </svg>
           </div>
-          <span className="text-white font-bold text-base tracking-tight">DegiTasks</span>
+          {!collapsed && <span className="text-white font-bold text-base tracking-tight flex-1">DegiTasks</span>}
+          <button
+            onClick={toggleCollapsed}
+            className="text-gray-500 hover:text-sidebar-text transition p-1 rounded flex-shrink-0"
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {collapsed
+                ? <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                : <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />}
+            </svg>
+          </button>
         </div>
 
         {/* Workspace name */}
-        {workspace && (
+        {workspace && !collapsed && (
           <div className="px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-sidebar-hover rounded-lg mx-2 transition">
             <div className="w-5 h-5 rounded bg-primary-blue flex items-center justify-center flex-shrink-0">
               <span className="text-white text-[9px] font-bold">{workspace.name.charAt(0).toUpperCase()}</span>
             </div>
             <span className="text-sidebar-text text-sm font-medium truncate flex-1">{workspace.name}</span>
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-500 flex-shrink-0">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
           </div>
         )}
 
@@ -162,46 +178,50 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
         <nav className="mt-3 px-2 space-y-0.5">
           <Link
             to="/dashboard"
+            title="Dashboard"
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sidebar-text hover:bg-sidebar-hover transition text-sm ${
               isDashboard ? 'bg-blue-600/20 text-white' : ''
             }`}
           >
-            <span className="text-gray-500"><DashboardIcon /></span>
-            <span>Dashboard</span>
+            <span className="text-gray-500 flex-shrink-0"><DashboardIcon /></span>
+            {!collapsed && <span>Dashboard</span>}
           </Link>
           <Link
             to="/inbox"
+            title="Activity log"
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sidebar-text hover:bg-sidebar-hover transition text-sm ${
               isInbox ? 'bg-blue-600/20 text-white' : ''
             }`}
           >
-            <span className="text-gray-500"><InboxIcon /></span>
-            <span>Activity log</span>
+            <span className="text-gray-500 flex-shrink-0"><InboxIcon /></span>
+            {!collapsed && <span>Activity log</span>}
           </Link>
         </nav>
 
         <div className="mt-4 mx-2 h-px bg-gray-700" />
 
         {/* Boards header */}
-        <div className="mt-4 px-4 flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Boards</span>
-          {workspaceLoading ? (
-            <div className="w-4 h-4 border-2 border-gray-600 border-t-gray-400 rounded-full animate-spin" />
-          ) : (
-            <button
-              onClick={() => setNewBoardModal(true)}
-              className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-sidebar-hover hover:text-sidebar-text transition"
-              title="New board"
-            >
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          )}
-        </div>
+        {!collapsed && (
+          <div className="mt-4 px-4 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Boards</span>
+            {workspaceLoading ? (
+              <div className="w-4 h-4 border-2 border-gray-600 border-t-gray-400 rounded-full animate-spin" />
+            ) : (
+              <button
+                onClick={() => setNewBoardModal(true)}
+                className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-sidebar-hover hover:text-sidebar-text transition"
+                title="New board"
+              >
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Invite members */}
-        {workspace && (
+        {workspace && !collapsed && (
           <button
             onClick={() => { setInviteModal(true); setInviteStatus(null); setInviteEmail('') }}
             className="mx-3 mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:bg-sidebar-hover hover:text-sidebar-text transition border border-dashed border-gray-700"
@@ -216,44 +236,46 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
         {/* Board list */}
         <div className="mt-2 px-2 flex-1 overflow-y-auto scrollbar-thin space-y-0.5">
           {workspaceLoading ? (
-            <p className="px-3 py-2 text-xs text-gray-500 italic">Setting up workspace…</p>
+            !collapsed && <p className="px-3 py-2 text-xs text-gray-500 italic">Setting up workspace…</p>
           ) : boards.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-gray-600">No boards yet</p>
+            !collapsed && <p className="px-3 py-2 text-xs text-gray-600">No boards yet</p>
           ) : (
             boards.map((board) => (
               <div key={board.id} className="group/board relative">
                 <Link
                   to={`/board/${board.id}`}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition pr-8 text-sm ${
+                  title={board.name}
+                  className={`flex items-center gap-2.5 px-2 py-2 rounded-lg transition text-sm ${collapsed ? 'justify-center' : 'pr-8'} ${
                     boardId === board.id
                       ? 'bg-blue-600/20 text-white'
                       : 'text-sidebar-text hover:bg-sidebar-hover'
                   }`}
                 >
-                  <span className="flex-shrink-0" style={{ color: boardId === board.id ? undefined : board.color }}>
+                  <span className="flex-shrink-0 text-base" style={{ color: boardId === board.id ? undefined : board.color }}>
                     {board.icon || '📋'}
                   </span>
-                  <span className="truncate">{board.name}</span>
+                  {!collapsed && <span className="truncate">{board.name}</span>}
                 </Link>
-                {/* "…" hover menu */}
-                <button
-                  onClick={(e) => openBoardSettings(e, board)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-gray-600 hover:bg-gray-700 hover:text-gray-300 opacity-0 group-hover/board:opacity-100 transition"
-                  title="Board settings"
-                >
-                  <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24">
-                    <circle cx="5" cy="12" r="1.5" />
-                    <circle cx="12" cy="12" r="1.5" />
-                    <circle cx="19" cy="12" r="1.5" />
-                  </svg>
-                </button>
+                {!collapsed && (
+                  <button
+                    onClick={(e) => openBoardSettings(e, board)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-gray-600 hover:bg-gray-700 hover:text-gray-300 opacity-0 group-hover/board:opacity-100 transition"
+                    title="Board settings"
+                  >
+                    <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="5" cy="12" r="1.5" />
+                      <circle cx="12" cy="12" r="1.5" />
+                      <circle cx="19" cy="12" r="1.5" />
+                    </svg>
+                  </button>
+                )}
               </div>
             ))
           )}
         </div>
 
-        {/* Member avatars */}
-        {workspaceMembers.length > 0 && (
+        {/* Member avatars — hidden when collapsed */}
+        {workspaceMembers.length > 0 && !collapsed && (
           <div className="px-4 py-2 flex items-center gap-1">
             <div className="flex items-center -space-x-1.5">
               {visibleMembers.map((member) => (
@@ -273,14 +295,10 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
           </div>
         )}
 
-        {/* User area + dark mode toggle */}
+        {/* User area — avatar + dark mode + sign out (no name) */}
         <div className="border-t border-gray-700 p-3">
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center ${collapsed ? 'flex-col gap-2' : 'gap-2'}`}>
             <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sidebar-text text-sm font-medium truncate">{profile?.full_name}</p>
-            </div>
-            {/* Dark mode toggle */}
             <button
               onClick={toggleTheme}
               title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -288,7 +306,6 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
             >
               {dark ? <SunIcon /> : <MoonIcon />}
             </button>
-            {/* Sign out */}
             <button
               onClick={handleSignOut}
               title="Sign out"

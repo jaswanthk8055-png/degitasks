@@ -126,13 +126,17 @@ export const useBoardStore = create((set, get) => ({
       }
     }
 
-    // Status options: prefer DB value, fall back to localStorage cache, then defaults
+    // Status options: use DB if it has actual entries, otherwise fall back to localStorage/defaults
     const dbStatusOptions = boardRes.data?.status_options
-    const statusOptions = dbStatusOptions || loadStatusOptions(boardId)
+    const statusOptions = (Array.isArray(dbStatusOptions) && dbStatusOptions.length > 0)
+      ? dbStatusOptions
+      : loadStatusOptions(boardId)
 
-    // Automations: prefer DB value, fall back to localStorage cache
+    // Automations: use DB if it has actual entries, otherwise fall back to localStorage
     const dbAutomations = boardRes.data?.automations
-    const automations = dbAutomations || loadAutomationsCache(boardId)
+    const automations = (Array.isArray(dbAutomations) && dbAutomations.length > 0)
+      ? dbAutomations
+      : loadAutomationsCache(boardId)
 
     set({
       currentBoard: boardRes.data,

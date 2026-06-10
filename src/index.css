@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #ffffff;
+    color: #323338;
+  }
+
+  .dark body {
+    background: #111111;
+    color: #e8e8e8;
+  }
+
+  #root {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  input, textarea, select, button {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  /* ── Scrollbar ── */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #e6e9ef transparent;
+  }
+  .dark .scrollbar-thin {
+    scrollbar-color: #3a3a3a transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #d0d4e4;
+    border-radius: 3px;
+  }
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb { background-color: #3a3a3a; }
+
+  /* ── Dark mode board surface ── */
+  .dark .bg-board-surface { background-color: #1a1a1a; }
+  .dark .border-board      { border-color: #333333; }
+}
+
+/* ── Task detail panel slide-in ── */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in {
+  animation: slide-in-right 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Toast slide-up ── */
+@keyframes toast-in {
+  from { transform: translateY(10px) scale(0.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1);       opacity: 1; }
+}
+.animate-toast-in { animation: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ── Command palette fade-scale ── */
+@keyframes palette-in {
+  from { transform: translateY(-8px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0) scale(1);        opacity: 1; }
+}
+.animate-palette-in { animation: palette-in 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ── Group collapse smooth height transition ── */
+.group-body-enter { overflow: hidden; animation: slide-down 0.2s ease-out; }
+@keyframes slide-down {
+  from { max-height: 0; opacity: 0; }
+  to   { max-height: 2000px; opacity: 1; }
+}
+
+/* ── Status pill dropdown slide ── */
+@keyframes dropdown-slide {
+  from { transform: translateY(-4px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.animate-dropdown { animation: dropdown-slide 0.12s ease-out; }
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 4px;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, #2a2a2a 25%, #333 50%, #2a2a2a 75%);
+  background-size: 800px 100%;
+}
+
+/* ── Dark mode main layout surfaces ── */
+.dark .main-surface  { background-color: #1a1a1a; }
+.dark .topbar-surface {
+  background-color: #1e1e1e;
+  border-color: #333333;
+}

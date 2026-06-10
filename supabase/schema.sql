@@ -136,6 +136,8 @@
     using (user_id = auth.uid() or workspace_id in (select id from public.workspaces where owner_id = auth.uid()));
   create policy "workspace_members_insert" on public.workspace_members for insert
     with check (workspace_id in (select id from public.workspaces where owner_id = auth.uid()) or user_id = auth.uid());
+  create policy "workspace_members_delete" on public.workspace_members for delete
+    using (workspace_id in (select id from public.workspaces where owner_id = auth.uid()));
 
   -- Boards: workspace members can see boards
   create policy "boards_select" on public.boards for select

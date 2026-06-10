@@ -49,6 +49,22 @@ export default function Sidebar({
   const [inviteStatus, setInviteStatus] = useState(null)
   const [inviteMsg, setInviteMsg] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [removingMemberId, setRemovingMemberId] = useState(null)
+
+  const handleRemoveMember = async (memberId) => {
+    if (!workspace) return
+    setRemovingMemberId(memberId)
+    try {
+      await supabase
+        .from('workspace_members')
+        .delete()
+        .eq('workspace_id', workspace.id)
+        .eq('user_id', memberId)
+      onMembersChange?.(workspace.id)
+    } finally {
+      setRemovingMemberId(null)
+    }
+  }
 
   const handleCreateBoard = async (e) => {
     e.preventDefault()
@@ -523,9 +539,24 @@ export default function Sidebar({
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Current members ({workspaceMembers.length})</p>
               <div className="space-y-1.5 max-h-32 overflow-y-auto scrollbar-thin">
                 {workspaceMembers.map((m) => (
-                  <div key={m.id} className="flex items-center gap-2.5">
+                  <div key={m.id} className="flex items-center gap-2.5 group/member">
                     <Avatar name={m.full_name} color={m.avatar_color} size="sm" />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{m.full_name}</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">{m.full_name}</span>
+                    {workspace?.owner_id === profile?.id && m.id !== profile?.id && (
+                      <button
+                        type="button"
+                        disabled={removingMemberId === m.id}
+                        onClick={() => handleRemoveMember(m.id)}
+                        className="opacity-0 group-hover/member:opacity-100 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-50"
+                        title="Remove member"
+                      >
+                        {removingMemberId === m.id ? (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="animate-spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

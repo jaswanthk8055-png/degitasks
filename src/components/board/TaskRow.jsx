@@ -91,22 +91,22 @@ export default function TaskRow({
       </div>
 
       {/* Status */}
-      <div className={`flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('status')}>
+      <div className="flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('status')}>
         <StatusPill status={task.status} statusColor={task.status_color} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Assignee */}
-      <div className={`flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('assignee')}>
+      <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('assignee')}>
         <AssigneePicker assigneeId={task.assignee_id} profiles={profiles} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Due Date */}
-      <div className={`flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('dueDate')}>
+      <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('dueDate')}>
         <DatePicker dueDate={task.due_date} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Priority */}
-      <div className={`flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('priority')}>
+      <div className="flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('priority')}>
         <PriorityPill priority={task.priority} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
@@ -149,7 +149,7 @@ function CustomColumnCell({ column, value, taskId, width, onUpdate, canEdit = tr
   const [editing,  setEditing]  = useState(false)
   const [localVal, setLocalVal] = useState('')
 
-  const startEdit = () => { if (!canEdit) return; setLocalVal(value ?? ''); setEditing(true) }
+  const startEdit = () => { setLocalVal(value ?? ''); setEditing(true) }
   const commitEdit = () => { setEditing(false); onUpdate(localVal) }
   const displayValue = value != null ? String(value) : ''
 

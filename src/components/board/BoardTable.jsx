@@ -12,7 +12,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { isThisWeek, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useBoardStore } from '../../stores/useBoardStore'
-import { useAuthStore } from '../../stores/useAuthStore'
+import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { useToastStore } from '../../stores/useToastStore'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, avatarColorFromName } from '../../lib/utils'
 import TaskGroup from './TaskGroup'
@@ -85,7 +85,8 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
     currentBoard, logActivity,
   } = useBoardStore()
-  const { profile } = useAuthStore()
+  const { profile, user } = useAuthStore()
+  const canEdit = user?.email === SUPER_USER_EMAIL
   const { addToast } = useToastStore()
 
   const [activeTask, setActiveTask]   = useState(null)
@@ -151,7 +152,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
 
   const handleDragEnd = async ({ active, over }) => {
     setActiveTask(null)
-    if (!over || active.id === over.id) return
+    if (!canEdit || !over || active.id === over.id) return
     const draggedTask = tasks.find((t) => t.id === active.id)
     const overTask    = tasks.find((t) => t.id === over.id)
     if (!draggedTask || !overTask) return
@@ -303,8 +304,8 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
         <div className="min-w-max">
           {renderGroups()}
 
-          {/* Add Group — only in default grouping */}
-          {!virtualGroups && (
+          {/* Add Group — only for super user in default grouping */}
+          {canEdit && !virtualGroups && (
             <div className="mt-4 px-4 pb-8">
               {addingGroup ? (
                 <form onSubmit={handleAddGroup} className="flex items-center gap-2">

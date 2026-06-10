@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useBoardStore } from '../../stores/useBoardStore'
+import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../../lib/utils'
 import NotificationBell from './NotificationBell'
 import Avatar from '../ui/Avatar'
 
-const VIEWS = ['Main Table', 'Kanban', 'Calendar']
+const VIEWS = ['Main Table', 'My Tasks', 'Kanban', 'Calendar']
 
 const GROUP_BY_OPTIONS = [
   { value: 'group',    label: 'Group',    desc: 'Your custom sections' },
@@ -27,6 +28,8 @@ export default function TopBar({
   onGroupByChange,
 }) {
   const { currentBoard, realtimeConnected, updateBoardName, profiles } = useBoardStore()
+  const { user } = useAuthStore()
+  const canEdit = user?.email === SUPER_USER_EMAIL
   const [editingName,  setEditingName]  = useState(false)
   const [nameValue,    setNameValue]    = useState('')
   const [groupByOpen,  setGroupByOpen]  = useState(false)
@@ -215,8 +218,8 @@ export default function TopBar({
             </div>
           )}
 
-          {/* Automations */}
-          {onAutomations && (
+          {/* Automations — super user only */}
+          {canEdit && onAutomations && (
             <button
               onClick={onAutomations}
               className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border-color dark:border-[#444] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition"

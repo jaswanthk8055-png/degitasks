@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useBoardStore } from '../../stores/useBoardStore'
+import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { GROUP_COLORS } from '../../lib/utils'
 import TaskRow from './TaskRow'
 import Modal from '../ui/Modal'
@@ -27,6 +28,8 @@ export default function TaskGroup({
   isVirtual = false,
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
+  const { user } = useAuthStore()
+  const canEdit = !isVirtual && user?.email === SUPER_USER_EMAIL
   const storageKey = `group-collapsed-${group.id}`
   const [collapsed,       setCollapsed]       = useState(() => localStorage.getItem(storageKey) === 'true')
   const [editingName,     setEditingName]     = useState(false)
@@ -127,9 +130,7 @@ export default function TaskGroup({
           </button>
 
           {/* Color dot */}
-          {isVirtual ? (
-            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }} />
-          ) : (
+          {canEdit ? (
             <div className="relative flex-shrink-0" ref={colorPickerRef}>
               <button
                 onClick={() => setColorPickerOpen((p) => !p)}
@@ -154,6 +155,8 @@ export default function TaskGroup({
                 </div>
               )}
             </div>
+          ) : (
+            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }} />
           )}
 
           {editingName ? (
@@ -171,9 +174,9 @@ export default function TaskGroup({
             />
           ) : (
             <span
-              onDoubleClick={isVirtual ? undefined : () => setEditingName(true)}
-              className="text-sm font-bold select-none"
-              style={{ color: group.color, cursor: isVirtual ? 'default' : 'default' }}
+              onDoubleClick={canEdit ? () => setEditingName(true) : undefined}
+              className="text-sm font-bold select-none cursor-default"
+              style={{ color: group.color }}
             >
               {group.name}
             </span>
@@ -183,8 +186,8 @@ export default function TaskGroup({
             {tasks.length} {tasks.length === 1 ? 'item' : 'items'}
           </span>
 
-          {/* Delete group button — only for real groups, revealed on hover */}
-          {!isVirtual && onDeleteGroup && (
+          {/* Delete group button — only for super user */}
+          {canEdit && onDeleteGroup && (
             <button
               onClick={() => setConfirmDelete(true)}
               className="ml-2 opacity-0 group-hover/grphdr:opacity-100 transition-opacity p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -231,8 +234,8 @@ export default function TaskGroup({
             ))}
           </SortableContext>
 
-          {/* Add task — hidden for virtual groups */}
-          {!isVirtual && (
+          {/* Add task — only for super user */}
+          {canEdit && (
             <div
               className="flex items-center gap-2 px-4 h-9 hover:bg-row-hover dark:hover:bg-[#252525] transition cursor-pointer group/add border-b border-border-color dark:border-[#333]"
               style={{ borderLeft: `3px solid ${group.color}` }}

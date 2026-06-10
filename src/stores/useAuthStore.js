@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { avatarColorFromName } from '../lib/utils'
 
+export const SUPER_USER_EMAIL = 'jaswanth.k@degitrans.com'
+
 export const useAuthStore = create((set, get) => ({
   user: null,
   profile: null,

@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useBoardStore } from '../../stores/useBoardStore'
+import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { COL_DEFAULTS } from './BoardTable'
 import StatusPill from './StatusPill'
 import PriorityPill from './PriorityPill'
@@ -21,6 +22,8 @@ export default function TaskRow({
 }) {
   const inputRef = useRef(null)
   const { taskColumnValues, updateColumnValue } = useBoardStore()
+  const { user } = useAuthStore()
+  const canEdit = user?.email === SUPER_USER_EMAIL
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
@@ -55,18 +58,20 @@ export default function TaskRow({
 
       {/* Drag handle + checkbox — fixed 40px */}
       <div className="w-10 h-9 flex items-center justify-center gap-1 flex-shrink-0">
-        <button
-          {...attributes}
-          {...listeners}
-          className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing transition opacity-0 group-hover/row:opacity-100"
-          tabIndex={-1}
-        >
-          <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24">
-            <circle cx="8" cy="5" r="1.5" /><circle cx="16" cy="5" r="1.5" />
-            <circle cx="8" cy="12" r="1.5" /><circle cx="16" cy="12" r="1.5" />
-            <circle cx="8" cy="19" r="1.5" /><circle cx="16" cy="19" r="1.5" />
-          </svg>
-        </button>
+        {canEdit && (
+          <button
+            {...attributes}
+            {...listeners}
+            className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing transition opacity-0 group-hover/row:opacity-100"
+            tabIndex={-1}
+          >
+            <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="8" cy="5" r="1.5" /><circle cx="16" cy="5" r="1.5" />
+              <circle cx="8" cy="12" r="1.5" /><circle cx="16" cy="12" r="1.5" />
+              <circle cx="8" cy="19" r="1.5" /><circle cx="16" cy="19" r="1.5" />
+            </svg>
+          </button>
+        )}
         <input type="checkbox" className="w-3 h-3 cursor-pointer accent-primary-blue" />
       </div>
 
@@ -86,22 +91,22 @@ export default function TaskRow({
       </div>
 
       {/* Status */}
-      <div className="flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('status')}>
+      <div className={`flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('status')}>
         <StatusPill status={task.status} statusColor={task.status_color} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Assignee */}
-      <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('assignee')}>
+      <div className={`flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('assignee')}>
         <AssigneePicker assigneeId={task.assignee_id} profiles={profiles} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Due Date */}
-      <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('dueDate')}>
+      <div className={`flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('dueDate')}>
         <DatePicker dueDate={task.due_date} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Priority */}
-      <div className="flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('priority')}>
+      <div className={`flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a] ${!canEdit ? 'pointer-events-none' : ''}`} style={fw('priority')}>
         <PriorityPill priority={task.priority} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
@@ -116,34 +121,37 @@ export default function TaskRow({
             value={colValues[col.id]}
             taskId={task.id}
             width={width}
+            canEdit={canEdit}
             onUpdate={(val) => updateColumnValue(task.id, col.id, val)}
           />
         )
       })}
 
-      {/* Delete button — fixed 32px, aligns with ColumnHeaders' "+" button */}
+      {/* Delete button — only for super user */}
       <div className="w-8 h-9 flex items-center justify-center flex-shrink-0">
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(task.id) }}
-          className="text-gray-300 hover:text-red-400 transition opacity-0 group-hover/row:opacity-100"
-          title="Delete task"
-          tabIndex={-1}
-        >
-          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        {canEdit && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(task.id) }}
+            className="text-gray-300 hover:text-red-400 transition opacity-0 group-hover/row:opacity-100"
+            title="Delete task"
+            tabIndex={-1}
+          >
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
 // ── Custom column cell ────────────────────────────────────────────────────────
-function CustomColumnCell({ column, value, taskId, width, onUpdate }) {
+function CustomColumnCell({ column, value, taskId, width, onUpdate, canEdit = true }) {
   const [editing,  setEditing]  = useState(false)
   const [localVal, setLocalVal] = useState('')
 
-  const startEdit = () => { setLocalVal(value ?? ''); setEditing(true) }
+  const startEdit = () => { if (!canEdit) return; setLocalVal(value ?? ''); setEditing(true) }
   const commitEdit = () => { setEditing(false); onUpdate(localVal) }
   const displayValue = value != null ? String(value) : ''
 

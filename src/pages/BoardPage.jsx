@@ -105,18 +105,26 @@ export default function BoardPage() {
         onAutomations={() => setAutomationsOpen(true)}
         filters={filters}
         onFiltersChange={setFilters}
-        filterOpen={filterOpen}
-        onFilterToggle={() => setFilterOpen((p) => !p)}
+        filterOpen={activeView === 'My Tasks' ? false : filterOpen}
+        onFilterToggle={activeView === 'My Tasks' ? null : () => setFilterOpen((p) => !p)}
         groupBy={groupBy}
-        onGroupByChange={setGroupBy}
+        onGroupByChange={activeView === 'My Tasks' ? null : setGroupBy}
       />
 
-      {activeView === 'Main Table' && (
+      {(activeView === 'Main Table' || activeView === 'My Tasks') && (
         <div className="flex-1 overflow-hidden flex flex-col">
           {groups.length === 0 ? (
             <EmptyBoard boardId={boardId} profileId={profile?.id} />
           ) : (
-            <BoardTable filters={filters} onOpenTask={handleOpenTask} groupBy={groupBy} />
+            <BoardTable
+              filters={
+                activeView === 'My Tasks'
+                  ? { assigneeIds: profile?.id ? [profile.id] : [], statuses: [], priorities: [], dueThisWeek: false }
+                  : filters
+              }
+              onOpenTask={handleOpenTask}
+              groupBy={activeView === 'My Tasks' ? 'group' : groupBy}
+            />
           )}
         </div>
       )}

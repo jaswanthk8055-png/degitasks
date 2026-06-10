@@ -142,6 +142,19 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
           read: false,
         })
         addToast(`Assigned to ${assigneeName}`)
+        // Fire-and-forget email — doesn't block the UI
+        fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assigneeId: updates.assignee_id,
+            taskTitle: prevTask?.title || 'a task',
+            assignerName: profile?.full_name || 'Someone',
+            boardName: currentBoard?.name || 'DegiTasks',
+            boardId: currentBoard?.id,
+            taskId,
+          }),
+        }).catch(() => {})
       }
     }
   }

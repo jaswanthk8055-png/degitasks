@@ -5,7 +5,7 @@ import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../../lib/utils'
 import NotificationBell from './NotificationBell'
 import Avatar from '../ui/Avatar'
 
-const VIEWS = ['Main Table', 'My Tasks', 'Kanban', 'Calendar']
+const VIEWS = ['Main Table', 'My Tasks', 'Summary', 'Calendar']
 
 const GROUP_BY_OPTIONS = [
   { value: 'group',    label: 'Group',    desc: 'Your custom sections' },
@@ -89,7 +89,7 @@ export default function TopBar({
   return (
     <div className="flex-shrink-0">
       {/* Main bar */}
-      <div className="h-14 bg-white dark:bg-[#1e1e1e] border-b border-border-color dark:border-[#333] flex items-center px-4 gap-3">
+      <div className="min-h-14 bg-white dark:bg-[#1e1e1e] border-b border-border-color dark:border-[#333] flex flex-wrap items-center px-4 gap-x-3 gap-y-2 py-2">
         {/* Board name */}
         <div className="flex items-center min-w-0 gap-2">
           {editingName ? (
@@ -107,7 +107,7 @@ export default function TopBar({
           ) : (
             <h1
               onDoubleClick={startEdit}
-              className="text-base font-semibold text-gray-900 dark:text-gray-100 cursor-default hover:text-primary-blue dark:hover:text-primary-blue transition select-none truncate"
+              className="text-base font-semibold text-gray-900 dark:text-gray-100 cursor-default hover:text-primary-blue dark:hover:text-primary-blue transition select-none truncate max-w-[160px] sm:max-w-none"
               title="Double-click to rename"
             >
               {currentBoard?.name || ''}
@@ -126,13 +126,13 @@ export default function TopBar({
           </div>
         </div>
 
-        {/* View switcher */}
-        <div className="flex items-center border border-border-color dark:border-[#444] rounded-lg overflow-hidden ml-2">
+        {/* View switcher — horizontally scrollable on small screens */}
+        <div className="flex items-center border border-border-color dark:border-[#444] rounded-lg overflow-x-auto flex-shrink-0">
           {VIEWS.map((view) => (
             <button
               key={view}
               onClick={() => onViewChange(view)}
-              className={`px-3 py-1.5 text-xs font-medium transition ${
+              className={`px-3 py-1.5 text-xs font-medium transition whitespace-nowrap ${
                 activeView === view
                   ? 'bg-blue-50 dark:bg-blue-900/30 text-primary-blue'
                   : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'
@@ -146,7 +146,7 @@ export default function TopBar({
         <div className="flex-1" />
 
         {/* Right actions */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Filter */}
           {onFilterToggle && (
             <button

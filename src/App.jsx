@@ -11,6 +11,7 @@ import HomePage from './pages/HomePage'
 import InboxPage from './pages/InboxPage'
 import DashboardPage from './pages/DashboardPage'
 import NotFoundPage from './pages/NotFoundPage'
+import ProfilePage from './pages/ProfilePage'
 
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize)
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/board/:boardId" element={<BoardPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

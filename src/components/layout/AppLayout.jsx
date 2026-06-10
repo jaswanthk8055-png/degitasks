@@ -15,6 +15,7 @@ export default function AppLayout() {
   const [workspaceMembers, setWorkspaceMembers] = useState([])
   const [workspaceLoading, setWorkspaceLoading] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   // Global Cmd+K / Ctrl+K
   useEffect(() => {
@@ -104,14 +105,49 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
+      {/* Mobile overlay backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar
         workspace={workspace}
         workspaceLoading={workspaceLoading}
         workspaceMembers={workspaceMembers}
         onMembersChange={fetchWorkspaceMembers}
         onOpenSearch={() => setPaletteOpen(true)}
+        mobileSidebarOpen={mobileSidebarOpen}
+        onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
       />
+
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white dark:bg-[#1a1a1a]">
+        {/* Mobile top bar */}
+        <div className="md:hidden flex items-center gap-2 px-4 h-12 bg-sidebar-bg border-b border-gray-700 flex-shrink-0">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="text-gray-400 hover:text-white transition p-1.5 rounded-lg"
+            title="Open menu"
+          >
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-primary-blue flex items-center justify-center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" fill="white" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" fill="white" opacity="0.7" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" fill="white" opacity="0.7" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" fill="white" opacity="0.5" />
+              </svg>
+            </div>
+            <span className="text-white font-bold text-sm">DegiTasks</span>
+          </div>
+        </div>
+
         <Outlet context={{ workspace, workspaceMembers }} />
       </main>
 

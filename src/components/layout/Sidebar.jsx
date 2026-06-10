@@ -10,7 +10,14 @@ import Modal from '../ui/Modal'
 const BOARD_ICONS = ['📋', '🚀', '⭐', '🎯', '💡', '🔥', '📊', '🛠️', '🎨', '📌']
 const BOARD_COLORS = ['#0073ea', '#00c875', '#e2445c', '#fdab3d', '#9d50dd', '#00c2cd']
 
-export default function Sidebar({ workspace, workspaceLoading = false, workspaceMembers = [], onMembersChange }) {
+export default function Sidebar({
+  workspace,
+  workspaceLoading = false,
+  workspaceMembers = [],
+  onMembersChange,
+  mobileSidebarOpen = false,
+  onCloseMobileSidebar,
+}) {
   const { boardId } = useParams()
   const location = useLocation()
   const { profile, signOut } = useAuthStore()
@@ -136,10 +143,22 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
   const extraCount = workspaceMembers.length > 5 ? workspaceMembers.length - 5 : 0
   const isDashboard = location.pathname === '/dashboard'
   const isInbox = location.pathname === '/inbox'
+  const isProfile = location.pathname === '/profile'
+
+  // close mobile sidebar on navigation
+  const handleNavClick = () => { onCloseMobileSidebar?.() }
 
   return (
     <>
-      <aside className={`flex-shrink-0 bg-sidebar-bg flex flex-col h-full overflow-hidden transition-all duration-200 ${collapsed ? 'w-14' : 'w-60'}`}>
+      {/* Desktop: static sidebar | Mobile: fixed drawer */}
+      <aside className={`
+        bg-sidebar-bg flex flex-col h-full overflow-hidden transition-all duration-200
+        md:relative md:flex-shrink-0 md:translate-x-0
+        fixed inset-y-0 left-0 z-50
+        ${collapsed ? 'md:w-14' : 'md:w-60'}
+        w-64
+        ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         {/* Logo + collapse toggle */}
         {collapsed ? (
           <div className="py-3 flex flex-col items-center gap-1">
@@ -153,7 +172,7 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
             </div>
             <button
               onClick={toggleCollapsed}
-              className="w-8 h-6 flex items-center justify-center rounded text-gray-400 hover:bg-sidebar-hover hover:text-white transition"
+              className="w-8 h-6 items-center justify-center rounded text-gray-400 hover:bg-sidebar-hover hover:text-white transition hidden md:flex"
               title="Expand sidebar"
             >
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -172,9 +191,20 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
               </svg>
             </div>
             <span className="text-white font-bold text-base tracking-tight flex-1">DegiTasks</span>
+            {/* Mobile close button */}
+            <button
+              onClick={onCloseMobileSidebar}
+              className="md:hidden text-gray-500 hover:text-sidebar-text transition p-1 rounded flex-shrink-0"
+              title="Close menu"
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            {/* Desktop collapse button */}
             <button
               onClick={toggleCollapsed}
-              className="text-gray-500 hover:text-sidebar-text transition p-1 rounded flex-shrink-0"
+              className="hidden md:inline-flex text-gray-500 hover:text-sidebar-text transition p-1 rounded flex-shrink-0"
               title="Collapse sidebar"
             >
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -190,6 +220,7 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
           <Link
             to="/dashboard"
             title="Dashboard"
+            onClick={handleNavClick}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sidebar-text hover:bg-sidebar-hover transition text-sm ${
               isDashboard ? 'bg-blue-600/20 text-white' : ''
             }`}
@@ -200,6 +231,7 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
           <Link
             to="/inbox"
             title="Activity log"
+            onClick={handleNavClick}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sidebar-text hover:bg-sidebar-hover transition text-sm ${
               isInbox ? 'bg-blue-600/20 text-white' : ''
             }`}
@@ -256,6 +288,7 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
                 <Link
                   to={`/board/${board.id}`}
                   title={board.name}
+                  onClick={handleNavClick}
                   className={`flex items-center gap-2.5 px-2 py-2 rounded-lg transition text-sm ${collapsed ? 'justify-center' : 'pr-8'} ${
                     boardId === board.id
                       ? 'bg-blue-600/20 text-white'
@@ -310,7 +343,9 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
         <div className="border-t border-gray-700 p-3">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
-              <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
+              <Link to="/profile" onClick={handleNavClick} title="Profile" className={`rounded-full transition ring-2 ${isProfile ? 'ring-primary-blue' : 'ring-transparent hover:ring-gray-600'}`}>
+                <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
+              </Link>
               <button onClick={toggleTheme} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
                 {dark ? <SunIcon /> : <MoonIcon />}
               </button>
@@ -322,14 +357,21 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sidebar-text text-sm font-medium truncate">{profile?.full_name}</p>
-              </div>
-              <button onClick={toggleTheme} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
+              <Link
+                to="/profile"
+                onClick={handleNavClick}
+                title="Edit profile"
+                className={`flex items-center gap-2 flex-1 min-w-0 rounded-lg px-1 py-0.5 transition ${isProfile ? 'bg-blue-600/20' : 'hover:bg-sidebar-hover'}`}
+              >
+                <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sidebar-text text-sm font-medium truncate">{profile?.full_name}</p>
+                </div>
+              </Link>
+              <button onClick={toggleTheme} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} className="text-gray-500 hover:text-sidebar-text transition p-1 rounded flex-shrink-0">
                 {dark ? <SunIcon /> : <MoonIcon />}
               </button>
-              <button onClick={handleSignOut} title="Sign out" className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
+              <button onClick={handleSignOut} title="Sign out" className="text-gray-500 hover:text-sidebar-text transition p-1 rounded flex-shrink-0">
                 <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>

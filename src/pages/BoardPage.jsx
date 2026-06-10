@@ -130,7 +130,7 @@ export default function BoardPage() {
         </div>
       )}
 
-      {activeView === 'Kanban' && (
+      {activeView === 'Summary' && (
         <KanbanView onOpenTask={handleOpenTask} />
       )}
 

@@ -102,14 +102,18 @@ export const useBoardStore = create((set, get) => ({
   fetchBoardData: async (boardId) => {
     set({ loading: true })
 
-    const [boardRes, groupsRes, tasksRes, profilesRes, columnsRes, subGroupsRes] = await Promise.all([
-      supabase.from('boards').select('*').eq('id', boardId).single(),
+    const boardRes = await supabase.from('boards').select('*').eq('id', boardId).single()
+    const workspaceId = boardRes.data?.workspace_id
+
+    const [groupsRes, tasksRes, membersRes, columnsRes, subGroupsRes] = await Promise.all([
       supabase.from('groups').select('*').eq('board_id', boardId).order('position'),
       supabase.from('tasks').select('*').eq('board_id', boardId).order('position'),
-      supabase.from('profiles').select('*'),
+      supabase.from('workspace_members').select('profiles(*)').eq('workspace_id', workspaceId),
       supabase.from('board_columns').select('*').eq('board_id', boardId).order('position'),
       supabase.from('sub_groups').select('*').eq('board_id', boardId).order('position'),
     ])
+
+    const profilesRes = { data: membersRes.data?.map((m) => m.profiles).filter(Boolean) ?? [] }
 
     // Fetch column values for all tasks in this board
     let taskColumnValues = {}

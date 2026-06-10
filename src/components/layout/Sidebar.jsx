@@ -184,15 +184,6 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
           </div>
         )}
 
-        {/* Workspace name */}
-        {workspace && !collapsed && (
-          <div className="px-4 py-2 flex items-center gap-2 cursor-pointer hover:bg-sidebar-hover rounded-lg mx-2 transition">
-            <div className="w-5 h-5 rounded bg-primary-blue flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-[9px] font-bold">{workspace.name.charAt(0).toUpperCase()}</span>
-            </div>
-            <span className="text-sidebar-text text-sm font-medium truncate flex-1">{workspace.name}</span>
-          </div>
-        )}
 
         {/* Nav links */}
         <nav className="mt-3 px-2 space-y-0.5">
@@ -315,27 +306,36 @@ export default function Sidebar({ workspace, workspaceLoading = false, workspace
           </div>
         )}
 
-        {/* User area — avatar + dark mode + sign out (no name) */}
+        {/* User area — avatar + name + dark mode + sign out */}
         <div className="border-t border-gray-700 p-3">
-          <div className={`flex items-center ${collapsed ? 'flex-col gap-2' : 'gap-2'}`}>
-            <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
-            <button
-              onClick={toggleTheme}
-              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="text-gray-500 hover:text-sidebar-text transition p-1 rounded"
-            >
-              {dark ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button
-              onClick={handleSignOut}
-              title="Sign out"
-              className="text-gray-500 hover:text-sidebar-text transition p-1 rounded"
-            >
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-2">
+              <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
+              <button onClick={toggleTheme} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
+                {dark ? <SunIcon /> : <MoonIcon />}
+              </button>
+              <button onClick={handleSignOut} title="Sign out" className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Avatar name={profile?.full_name} color={profile?.avatar_color} size="sm" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sidebar-text text-sm font-medium truncate">{profile?.full_name}</p>
+              </div>
+              <button onClick={toggleTheme} title={dark ? 'Switch to light mode' : 'Switch to dark mode'} className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
+                {dark ? <SunIcon /> : <MoonIcon />}
+              </button>
+              <button onClick={handleSignOut} title="Sign out" className="text-gray-500 hover:text-sidebar-text transition p-1 rounded">
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 

@@ -112,6 +112,20 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
+  // Find a section by name in the target group, or create it if missing.
+  // Returns the sub_group_id to use, or null if the task had no section.
+  const findOrCreateSubGroup = async (sourceSubGroupId, targetGroupId) => {
+    if (!sourceSubGroupId) return null
+    const source = subGroups.find((sg) => sg.id === sourceSubGroupId)
+    if (!source) return null
+    const existing = subGroups.find(
+      (sg) => sg.group_id === targetGroupId && sg.name === source.name
+    )
+    if (existing) return existing.id
+    const created = await createSubGroup(currentBoard.id, targetGroupId, source.name)
+    return created.id
+  }
+
   const handleUpdateTask = async (taskId, updates) => {
     const prevTask = tasks.find((t) => t.id === taskId)
     await updateTask(taskId, updates)
@@ -125,9 +139,11 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         if (!rule.enabled) continue
         if (rule.trigger.type === 'status_change' && rule.trigger.value === updates.status) {
           if (rule.action.type === 'move_to_group') {
-            // Also clear sub_group_id — sections belong to a specific group and don't transfer
-            await updateTask(taskId, { group_id: rule.action.groupId, sub_group_id: null })
-            const groupName = groups.find((g) => g.id === rule.action.groupId)?.name
+            const targetGroupId = rule.action.groupId
+            // Mirror the section into the target group (find by name or create)
+            const newSubGroupId = await findOrCreateSubGroup(prevTask?.sub_group_id, targetGroupId)
+            await updateTask(taskId, { group_id: targetGroupId, sub_group_id: newSubGroupId })
+            const groupName = groups.find((g) => g.id === targetGroupId)?.name
             if (groupName) addToast(`Moved to "${groupName}"`)
           }
         }
@@ -206,8 +222,9 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       reordered.splice(newIdx, 0, moved)
       await Promise.all(reordered.map((t, i) => updateTask(t.id, { position: i })))
     } else {
-      // Clear sub_group_id when dragging across groups — sections don't transfer
-      await updateTask(draggedTask.id, { group_id: overTask.group_id, position: overTask.position, sub_group_id: null })
+      // Mirror section into target group by name (find or create), then move
+      const newSubGroupId = await findOrCreateSubGroup(draggedTask.sub_group_id, overTask.group_id)
+      await updateTask(draggedTask.id, { group_id: overTask.group_id, position: overTask.position, sub_group_id: newSubGroupId })
     }
   }
 

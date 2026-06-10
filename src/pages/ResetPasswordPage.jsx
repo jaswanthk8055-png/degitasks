@@ -1,15 +1,41 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/useAuthStore'
 
 export default function ResetPasswordPage() {
   const updatePassword = useAuthStore((s) => s.updatePassword)
   const navigate       = useNavigate()
+  const [ready,     setReady]     = useState(false)
+  const [invalid,   setInvalid]   = useState(false)
   const [password,  setPassword]  = useState('')
   const [confirm,   setConfirm]   = useState('')
   const [error,     setError]     = useState('')
   const [loading,   setLoading]   = useState(false)
   const [done,      setDone]      = useState(false)
+
+  useEffect(() => {
+    // Supabase fires PASSWORD_RECOVERY when the reset link tokens are valid
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    })
+
+    // Fallback: if session already exists (page loaded after token exchange)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setReady(true)
+    })
+
+    // If no PASSWORD_RECOVERY event after 6s, the link is invalid/expired
+    const timeout = setTimeout(() => setInvalid(true), 6000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
+  }, [])
+
+  // Cancel the invalid state once ready
+  useEffect(() => { if (ready) setInvalid(false) }, [ready])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -55,12 +81,36 @@ export default function ResetPasswordPage() {
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Password updated!</h2>
               <p className="text-sm text-gray-500">Redirecting you to the app…</p>
             </div>
+
+          ) : !ready && invalid ? (
+            <div className="text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#e2445c" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Link invalid or expired</h2>
+              <p className="text-sm text-gray-500 mb-5">
+                This reset link has expired or already been used. Request a new one.
+              </p>
+              <Link
+                to="/forgot-password"
+                className="px-5 py-2.5 bg-primary-blue text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition"
+              >
+                Request new link
+              </Link>
+            </div>
+
+          ) : !ready ? (
+            <div className="text-center py-4">
+              <div className="w-8 h-8 border-2 border-primary-blue border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Verifying reset link…</p>
+            </div>
+
           ) : (
             <>
               <h2 className="text-xl font-semibold text-gray-900 text-center mb-1">Set new password</h2>
-              <p className="text-sm text-gray-500 text-center mb-6">
-                Choose a strong password for your account.
-              </p>
+              <p className="text-sm text-gray-500 text-center mb-6">Choose a strong password for your account.</p>
 
               {error && (
                 <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -70,9 +120,7 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    New password
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">New password</label>
                   <input
                     type="password"
                     value={password}
@@ -83,11 +131,8 @@ export default function ResetPasswordPage() {
                     className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent transition"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Confirm password
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password</label>
                   <input
                     type="password"
                     value={confirm}
@@ -97,7 +142,6 @@ export default function ResetPasswordPage() {
                     className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent transition"
                   />
                 </div>
-
                 <button
                   type="submit"
                   disabled={loading}

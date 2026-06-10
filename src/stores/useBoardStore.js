@@ -65,9 +65,17 @@ export const useBoardStore = create((set, get) => ({
     }))
   },
 
-  updateStatusOptions: (boardId, options) => {
+  updateStatusOptions: async (boardId, options) => {
+    // Save to Supabase so all users see the same options
+    await supabase.from('boards').update({ status_options: options }).eq('id', boardId)
+    // Also cache locally as fallback
     saveStatusOptionsToStorage(boardId, options)
-    set({ statusOptions: options })
+    set((s) => ({
+      statusOptions: options,
+      currentBoard: s.currentBoard?.id === boardId
+        ? { ...s.currentBoard, status_options: options }
+        : s.currentBoard,
+    }))
   },
 
   // ─── Groups ───────────────────────────────────────────────────────
@@ -99,6 +107,10 @@ export const useBoardStore = create((set, get) => ({
       }
     }
 
+    // Status options: prefer DB value, fall back to localStorage cache, then defaults
+    const dbStatusOptions = boardRes.data?.status_options
+    const statusOptions = dbStatusOptions || loadStatusOptions(boardId)
+
     set({
       currentBoard: boardRes.data,
       groups: groupsRes.data || [],
@@ -106,7 +118,7 @@ export const useBoardStore = create((set, get) => ({
       profiles: profilesRes.data || [],
       boardColumns: columnsRes.data || [],
       taskColumnValues,
-      statusOptions: loadStatusOptions(boardId),
+      statusOptions,
       loading: false,
     })
   },

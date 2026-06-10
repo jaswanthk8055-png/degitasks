@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
-import { randomGroupColor } from '../lib/utils'
+import { randomGroupColor, loadStatusOptions, saveStatusOptionsToStorage } from '../lib/utils'
 
 export const useBoardStore = create((set, get) => ({
   boards: [],
@@ -10,6 +10,7 @@ export const useBoardStore = create((set, get) => ({
   profiles: [],
   boardColumns: [],
   taskColumnValues: {},    // { taskId: { columnId: value, ... }, ... }
+  statusOptions: [],
   workspaceId: null,
   realtimeConnected: false,
   loading: false,
@@ -64,6 +65,11 @@ export const useBoardStore = create((set, get) => ({
     }))
   },
 
+  updateStatusOptions: (boardId, options) => {
+    saveStatusOptionsToStorage(boardId, options)
+    set({ statusOptions: options })
+  },
+
   // ─── Groups ───────────────────────────────────────────────────────
   fetchBoardData: async (boardId) => {
     set({ loading: true })
@@ -100,6 +106,7 @@ export const useBoardStore = create((set, get) => ({
       profiles: profilesRes.data || [],
       boardColumns: columnsRes.data || [],
       taskColumnValues,
+      statusOptions: loadStatusOptions(boardId),
       loading: false,
     })
   },

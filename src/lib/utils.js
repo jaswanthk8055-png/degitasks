@@ -13,6 +13,27 @@ export const STATUS_OPTIONS = [
   { label: 'In Review', color: '#0086c0' },
 ]
 
+export const STATUS_COLORS = [
+  '#c4c4c4', '#fdab3d', '#00c875', '#e2445c', '#0086c0',
+  '#9d50dd', '#037f4c', '#ff7575', '#bb3354', '#7e3af2',
+  '#0073ea', '#579bfc', '#333333', '#00c2cd', '#f65f7c',
+]
+
+export function loadStatusOptions(boardId) {
+  try {
+    const raw = localStorage.getItem(`status-options-${boardId}`)
+    return raw ? JSON.parse(raw) : [...STATUS_OPTIONS]
+  } catch {
+    return [...STATUS_OPTIONS]
+  }
+}
+
+export function saveStatusOptionsToStorage(boardId, options) {
+  try {
+    localStorage.setItem(`status-options-${boardId}`, JSON.stringify(options))
+  } catch {}
+}
+
 export const PRIORITY_OPTIONS = [
   { label: 'Low', color: '#579bfc' },
   { label: 'Medium', color: '#fdab3d' },

@@ -26,6 +26,7 @@ export default function TaskGroup({
   colWidths,
   onWidthChange,
   isVirtual = false,
+  hideAddTask = false,
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
   const { user } = useAuthStore()
@@ -234,8 +235,8 @@ export default function TaskGroup({
             ))}
           </SortableContext>
 
-          {/* Add task — all users can create tasks (not in virtual groups) */}
-          {!isVirtual && (
+          {/* Add task — all users can create tasks (not in virtual groups or My Tasks) */}
+          {!isVirtual && !hideAddTask && (
             <div
               className="flex items-center gap-2 px-4 h-9 hover:bg-row-hover dark:hover:bg-[#252525] transition cursor-pointer group/add border-b border-border-color dark:border-[#333]"
               style={{ borderLeft: `3px solid ${group.color}` }}

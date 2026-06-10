@@ -79,7 +79,7 @@ function buildVirtualGroups(groupBy, tasks, profiles) {
   return null
 }
 
-export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
+export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false }) {
   const {
     groups, tasks, profiles, boardColumns,
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
@@ -265,6 +265,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
             colWidths={colWidths}
             onWidthChange={handleWidthChange}
             isVirtual
+            hideAddTask
           />
         )
       })
@@ -288,6 +289,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group' }) {
           onOpenTask={onOpenTask}
           colWidths={colWidths}
           onWidthChange={handleWidthChange}
+          hideAddTask={hideAddTask}
         />
       )
     })

@@ -124,6 +124,7 @@ export default function BoardPage() {
               }
               onOpenTask={handleOpenTask}
               groupBy={activeView === 'My Tasks' ? 'group' : groupBy}
+              hideAddTask={activeView === 'My Tasks'}
             />
           )}
         </div>

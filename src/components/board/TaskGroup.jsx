@@ -16,12 +16,16 @@ const COLUMN_TYPES = [
 export default function TaskGroup({
   group,
   tasks,
+  subGroups = [],
   profiles,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
   onUpdateGroupName,
   onDeleteGroup,
+  onAddSubGroup,
+  onUpdateSubGroup,
+  onDeleteSubGroup,
   onOpenTask,
   colWidths,
   onWidthChange,
@@ -32,19 +36,25 @@ export default function TaskGroup({
   const { user } = useAuthStore()
   const canEdit = !isVirtual && user?.email === SUPER_USER_EMAIL
   const storageKey = `group-collapsed-${group.id}`
-  const [collapsed,       setCollapsed]       = useState(() => localStorage.getItem(storageKey) === 'true')
-  const [editingName,     setEditingName]     = useState(false)
-  const [nameValue,       setNameValue]       = useState(group.name)
-  const [newTaskId,       setNewTaskId]       = useState(null)
-  const [addColModal,     setAddColModal]     = useState(false)
-  const [confirmDelete,   setConfirmDelete]   = useState(false)
-  const [newColLabel,     setNewColLabel]     = useState('')
-  const [newColType,      setNewColType]      = useState('text')
-  const [savingCol,       setSavingCol]       = useState(false)
-  const [colContextMenu,  setColContextMenu]  = useState(null)
-  const [renamingColId,   setRenamingColId]   = useState(null)
-  const [renameValue,     setRenameValue]     = useState('')
-  const [colorPickerOpen, setColorPickerOpen] = useState(false)
+  const [collapsed,           setCollapsed]           = useState(() => localStorage.getItem(storageKey) === 'true')
+  const [editingName,         setEditingName]         = useState(false)
+  const [nameValue,           setNameValue]           = useState(group.name)
+  const [newTaskId,           setNewTaskId]           = useState(null)
+  const [addColModal,         setAddColModal]         = useState(false)
+  const [confirmDelete,       setConfirmDelete]       = useState(false)
+  const [newColLabel,         setNewColLabel]         = useState('')
+  const [newColType,          setNewColType]          = useState('text')
+  const [savingCol,           setSavingCol]           = useState(false)
+  const [colContextMenu,      setColContextMenu]      = useState(null)
+  const [renamingColId,       setRenamingColId]       = useState(null)
+  const [renameValue,         setRenameValue]         = useState('')
+  const [colorPickerOpen,     setColorPickerOpen]     = useState(false)
+  // Sub-group state
+  const [collapsedSGs,        setCollapsedSGs]        = useState({})
+  const [addingSubGroup,      setAddingSubGroup]      = useState(false)
+  const [newSGName,           setNewSGName]           = useState('')
+  const [editingSGId,         setEditingSGId]         = useState(null)
+  const [editingSGName,       setEditingSGName]       = useState('')
   const contextMenuRef    = useRef(null)
   const colorPickerRef    = useRef(null)
 
@@ -82,13 +92,32 @@ export default function TaskGroup({
     else setNameValue(group.name)
   }
 
-  const handleAddTask = async () => {
-    const task = await onAddTask(group.id)
+  const handleAddTask = async (subGroupId = null) => {
+    const task = await onAddTask(group.id, subGroupId)
     if (task) {
       setNewTaskId(task.id)
       if (collapsed) { setCollapsed(false); localStorage.setItem(storageKey, 'false') }
+      if (subGroupId) setCollapsedSGs((prev) => ({ ...prev, [subGroupId]: false }))
     }
   }
+
+  const toggleSG = (sgId) => setCollapsedSGs((prev) => ({ ...prev, [sgId]: !prev[sgId] }))
+
+  const handleAddSubGroup = async (e) => {
+    e.preventDefault()
+    if (!newSGName.trim() || !onAddSubGroup) return
+    await onAddSubGroup(newSGName.trim())
+    setNewSGName('')
+    setAddingSubGroup(false)
+  }
+
+  const commitSGName = async (sg) => {
+    const trimmed = editingSGName.trim()
+    if (trimmed && trimmed !== sg.name) await onUpdateSubGroup?.(sg.id, { name: trimmed })
+    setEditingSGId(null)
+  }
+
+  const ungroupedTasks = tasks.filter((t) => !t.sub_group_id)
 
   const handleAddColumn = async (e) => {
     e.preventDefault()
@@ -219,7 +248,8 @@ export default function TaskGroup({
           />
 
           <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-            {tasks.map((task) => (
+            {/* Ungrouped tasks (no sub_group_id) */}
+            {ungroupedTasks.map((task) => (
               <TaskRow
                 key={task.id}
                 task={task}
@@ -233,14 +263,141 @@ export default function TaskGroup({
                 colWidths={colWidths}
               />
             ))}
+
+            {/* Sub-group sections */}
+            {subGroups.map((sg) => {
+              const sgTasks = tasks.filter((t) => t.sub_group_id === sg.id)
+              const sgCollapsed = !!collapsedSGs[sg.id]
+              return (
+                <div key={sg.id}>
+                  {/* Sub-group header */}
+                  <div
+                    className="flex items-center gap-1.5 pl-6 pr-3 h-8 bg-gray-50 dark:bg-[#1d1d1d] border-b border-border-color dark:border-[#2a2a2a] group/sghdr"
+                    style={{ borderLeft: `3px solid ${group.color}` }}
+                  >
+                    <button onClick={() => toggleSG(sg.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                        className={`transition-transform duration-150 ${sgCollapsed ? '-rotate-90' : ''}`}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-60" style={{ backgroundColor: group.color }} />
+
+                    {editingSGId === sg.id ? (
+                      <input
+                        autoFocus
+                        value={editingSGName}
+                        onChange={(e) => setEditingSGName(e.target.value)}
+                        onBlur={() => commitSGName(sg)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitSGName(sg)
+                          if (e.key === 'Escape') setEditingSGId(null)
+                        }}
+                        className="text-xs font-semibold border-b border-primary-blue outline-none bg-transparent text-gray-700 dark:text-gray-200 flex-1"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={canEdit ? () => { setEditingSGId(sg.id); setEditingSGName(sg.name) } : undefined}
+                        className="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 cursor-default select-none truncate"
+                        title={canEdit ? 'Double-click to rename' : undefined}
+                      >
+                        {sg.name}
+                      </span>
+                    )}
+
+                    <span className="text-[10px] text-gray-400 dark:text-gray-600 flex-shrink-0">{sgTasks.length}</span>
+
+                    {canEdit && (
+                      <button
+                        onClick={() => onDeleteSubGroup?.(sg.id)}
+                        className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
+                        title="Delete section"
+                      >
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sub-group tasks */}
+                  {!sgCollapsed && (
+                    <>
+                      {sgTasks.map((task) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          groupColor={group.color}
+                          profiles={profiles}
+                          onUpdate={onUpdateTask}
+                          onDelete={onDeleteTask}
+                          onOpenDetail={onOpenTask}
+                          autoFocus={task.id === newTaskId}
+                          extraColumns={visibleColumns}
+                          colWidths={colWidths}
+                        />
+                      ))}
+                      {/* Add task inside sub-group */}
+                      {!isVirtual && !hideAddTask && (
+                        <div
+                          className="flex items-center gap-2 pl-8 pr-4 h-8 hover:bg-row-hover dark:hover:bg-[#252525] transition cursor-pointer group/sgadd border-b border-border-color dark:border-[#2a2a2a]"
+                          style={{ borderLeft: `3px solid ${group.color}` }}
+                          onClick={() => handleAddTask(sg.id)}
+                        >
+                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-300 group-hover/sgadd:text-primary-blue transition flex-shrink-0">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                          </svg>
+                          <span className="text-[11px] text-gray-300 group-hover/sgadd:text-primary-blue transition">+ Add task</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </SortableContext>
 
-          {/* Add task — all users can create tasks (not in virtual groups or My Tasks) */}
+          {/* Add sub-group input */}
+          {canEdit && !isVirtual && addingSubGroup ? (
+            <form
+              onSubmit={handleAddSubGroup}
+              className="flex items-center gap-2 pl-6 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a]"
+              style={{ borderLeft: `3px solid ${group.color}` }}
+            >
+              <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-40" style={{ backgroundColor: group.color }} />
+              <input
+                autoFocus
+                value={newSGName}
+                onChange={(e) => setNewSGName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') { setAddingSubGroup(false); setNewSGName('') } }}
+                placeholder="Section name…"
+                className="flex-1 text-xs bg-transparent outline-none border-b border-primary-blue text-gray-700 dark:text-gray-200 py-0.5"
+              />
+              <button type="submit" disabled={!newSGName.trim()} className="text-[10px] text-primary-blue font-medium disabled:opacity-40">Add</button>
+              <button type="button" onClick={() => { setAddingSubGroup(false); setNewSGName('') }} className="text-[10px] text-gray-400">Cancel</button>
+            </form>
+          ) : canEdit && !isVirtual ? (
+            <div
+              className="flex items-center gap-2 pl-6 pr-3 h-7 hover:bg-gray-50 dark:hover:bg-[#1d1d1d] transition cursor-pointer group/addsg border-b border-border-color dark:border-[#2a2a2a] opacity-0 hover:opacity-100 focus-within:opacity-100"
+              style={{ borderLeft: `3px solid ${group.color}` }}
+              onClick={() => setAddingSubGroup(true)}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+            >
+              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-300 group-hover/addsg:text-gray-500 transition flex-shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+              <span className="text-[11px] text-gray-300 group-hover/addsg:text-gray-500 transition">+ Add section</span>
+            </div>
+          ) : null}
+
+          {/* Add task to group (ungrouped) */}
           {!isVirtual && !hideAddTask && (
             <div
               className="flex items-center gap-2 px-4 h-9 hover:bg-row-hover dark:hover:bg-[#252525] transition cursor-pointer group/add border-b border-border-color dark:border-[#333]"
               style={{ borderLeft: `3px solid ${group.color}` }}
-              onClick={handleAddTask}
+              onClick={() => handleAddTask(null)}
             >
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-400 group-hover/add:text-primary-blue transition flex-shrink-0">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />

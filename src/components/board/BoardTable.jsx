@@ -80,8 +80,9 @@ function buildVirtualGroups(groupBy, tasks, profiles) {
 
 export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false }) {
   const {
-    groups, tasks, profiles, boardColumns, automations,
+    groups, tasks, subGroups, profiles, boardColumns, automations,
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
+    createSubGroup, updateSubGroup, deleteSubGroup,
     currentBoard, logActivity,
   } = useBoardStore()
   const { profile, user } = useAuthStore()
@@ -216,9 +217,9 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     setAddingGroup(false)
   }
 
-  const handleAddTask = async (groupId) => {
+  const handleAddTask = async (groupId, subGroupId = null) => {
     if (!currentBoard) return null
-    const task = await createTask(currentBoard.id, groupId, profile?.id)
+    const task = await createTask(currentBoard.id, groupId, profile?.id, subGroupId)
     if (task) addToast('Task created')
     return task
   }
@@ -286,17 +287,24 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         .filter((t) => t.group_id === group.id)
         .filter(filterTask)
         .sort((a, b) => a.position - b.position)
+      const groupSubGroups = subGroups
+        .filter((sg) => sg.group_id === group.id)
+        .sort((a, b) => a.position - b.position)
       return (
         <TaskGroup
           key={group.id}
           group={group}
           tasks={groupTasks}
+          subGroups={groupSubGroups}
           profiles={profiles}
           onAddTask={handleAddTask}
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           onUpdateGroupName={updateGroupName}
           onDeleteGroup={handleDeleteGroup}
+          onAddSubGroup={(name) => createSubGroup(currentBoard.id, group.id, name)}
+          onUpdateSubGroup={updateSubGroup}
+          onDeleteSubGroup={deleteSubGroup}
           onOpenTask={onOpenTask}
           colWidths={colWidths}
           onWidthChange={handleWidthChange}

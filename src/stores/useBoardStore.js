@@ -14,6 +14,7 @@ export const useBoardStore = create((set, get) => ({
   currentBoard: null,
   groups: [],
   tasks: [],
+  subGroups: [],
   profiles: [],
   boardColumns: [],
   taskColumnValues: {},    // { taskId: { columnId: value, ... }, ... }
@@ -101,12 +102,13 @@ export const useBoardStore = create((set, get) => ({
   fetchBoardData: async (boardId) => {
     set({ loading: true })
 
-    const [boardRes, groupsRes, tasksRes, profilesRes, columnsRes] = await Promise.all([
+    const [boardRes, groupsRes, tasksRes, profilesRes, columnsRes, subGroupsRes] = await Promise.all([
       supabase.from('boards').select('*').eq('id', boardId).single(),
       supabase.from('groups').select('*').eq('board_id', boardId).order('position'),
       supabase.from('tasks').select('*').eq('board_id', boardId).order('position'),
       supabase.from('profiles').select('*'),
       supabase.from('board_columns').select('*').eq('board_id', boardId).order('position'),
+      supabase.from('sub_groups').select('*').eq('board_id', boardId).order('position'),
     ])
 
     // Fetch column values for all tasks in this board
@@ -142,6 +144,7 @@ export const useBoardStore = create((set, get) => ({
       currentBoard: boardRes.data,
       groups: groupsRes.data || [],
       tasks: tasksRes.data || [],
+      subGroups: subGroupsRes.data || [],
       profiles: profilesRes.data || [],
       boardColumns: columnsRes.data || [],
       taskColumnValues,
@@ -190,8 +193,38 @@ export const useBoardStore = create((set, get) => ({
     }))
   },
 
+  // ─── Sub-groups ───────────────────────────────────────────────────
+  createSubGroup: async (boardId, groupId, name) => {
+    const existing = get().subGroups.filter((sg) => sg.group_id === groupId)
+    const position = existing.length
+    const { data, error } = await supabase
+      .from('sub_groups')
+      .insert({ board_id: boardId, group_id: groupId, name, position })
+      .select()
+      .single()
+    if (error) throw error
+    set((s) => ({ subGroups: [...s.subGroups, data] }))
+    return data
+  },
+
+  updateSubGroup: async (subGroupId, updates) => {
+    await supabase.from('sub_groups').update(updates).eq('id', subGroupId)
+    set((s) => ({
+      subGroups: s.subGroups.map((sg) => (sg.id === subGroupId ? { ...sg, ...updates } : sg)),
+    }))
+  },
+
+  deleteSubGroup: async (subGroupId) => {
+    await supabase.from('tasks').update({ sub_group_id: null }).eq('sub_group_id', subGroupId)
+    await supabase.from('sub_groups').delete().eq('id', subGroupId)
+    set((s) => ({
+      subGroups: s.subGroups.filter((sg) => sg.id !== subGroupId),
+      tasks: s.tasks.map((t) => t.sub_group_id === subGroupId ? { ...t, sub_group_id: null } : t),
+    }))
+  },
+
   // ─── Tasks ────────────────────────────────────────────────────────
-  createTask: async (boardId, groupId, userId) => {
+  createTask: async (boardId, groupId, userId, subGroupId = null) => {
     const groupTasks = get().tasks.filter((t) => t.group_id === groupId)
     const position = groupTasks.length
 
@@ -200,6 +233,7 @@ export const useBoardStore = create((set, get) => ({
       .insert({
         board_id: boardId,
         group_id: groupId,
+        sub_group_id: subGroupId,
         title: '',
         status: 'Not Started',
         status_color: '#c4c4c4',
@@ -335,6 +369,18 @@ export const useBoardStore = create((set, get) => ({
         }
         if (eventType === 'DELETE') {
           return { boardColumns: s.boardColumns.filter((c) => c.id !== oldRecord.id) }
+        }
+      }
+      if (table === 'sub_groups') {
+        if (eventType === 'INSERT') {
+          const exists = s.subGroups.some((sg) => sg.id === newRecord.id)
+          return exists ? {} : { subGroups: [...s.subGroups, newRecord].sort((a, b) => a.position - b.position) }
+        }
+        if (eventType === 'UPDATE') {
+          return { subGroups: s.subGroups.map((sg) => (sg.id === newRecord.id ? newRecord : sg)) }
+        }
+        if (eventType === 'DELETE') {
+          return { subGroups: s.subGroups.filter((sg) => sg.id !== oldRecord.id) }
         }
       }
       if (table === 'boards' && eventType === 'UPDATE') {

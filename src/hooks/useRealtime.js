@@ -27,6 +27,13 @@ export function useRealtime(boardId) {
       )
       .on(
         'postgres_changes',
+        { event: '*', schema: 'public', table: 'sub_groups', filter: `board_id=eq.${boardId}` },
+        (payload) => {
+          applyRealtimeEvent('sub_groups', payload.eventType, payload.new, payload.old)
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
         (payload) => {
           applyRealtimeEvent('boards', 'UPDATE', payload.new, payload.old)

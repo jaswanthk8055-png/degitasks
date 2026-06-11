@@ -11,7 +11,7 @@ import {
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useToastStore } from '../../stores/useToastStore'
-import { STATUS_OPTIONS, PRIORITY_OPTIONS, formatDueDate, applyTaskFilters } from '../../lib/utils'
+import { PRIORITY_OPTIONS, formatDueDate, applyTaskFilters } from '../../lib/utils'
 import Avatar from '../ui/Avatar'
 
 // ── Droppable column ────────────────────────────────────────────────
@@ -125,7 +125,7 @@ function GhostCard({ task }) {
 
 // ── Main export ──────────────────────────────────────────────────────
 export default function KanbanView({ filters, onOpenTask }) {
-  const { tasks, groups, profiles, createTask, updateTask, currentBoard } = useBoardStore()
+  const { tasks, groups, profiles, statusOptions, createTask, updateTask, currentBoard } = useBoardStore()
   const { profile } = useAuthStore()
   const { addToast } = useToastStore()
   const [activeDragTask, setActiveDragTask] = useState(null)
@@ -134,17 +134,22 @@ export default function KanbanView({ filters, onOpenTask }) {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
 
+  // Exclude "Done" — completed tasks don't need active tracking in Kanban
+  const kanbanStatuses = useMemo(
+    () => statusOptions.filter((s) => s.label !== 'Done'),
+    [statusOptions]
+  )
+
   const tasksByStatus = useMemo(() => {
-    const filtered = applyTaskFilters(tasks, filters)
+    const filtered = applyTaskFilters(tasks, filters).filter((t) => t.status !== 'Done')
     const map = {}
-    STATUS_OPTIONS.forEach((s) => { map[s.label] = [] })
+    kanbanStatuses.forEach((s) => { map[s.label] = [] })
     filtered.forEach((t) => {
       const key = t.status || 'Not Started'
       if (map[key]) map[key].push(t)
-      else map['Not Started'].push(t)
     })
     return map
-  }, [tasks, filters])
+  }, [tasks, filters, kanbanStatuses])
 
   const handleDragStart = ({ active }) => {
     setActiveDragTask(tasks.find((t) => t.id === active.id) || null)
@@ -156,7 +161,7 @@ export default function KanbanView({ filters, onOpenTask }) {
     const task = tasks.find((t) => t.id === active.id)
     if (!task || over.id === task.status) return
     const newStatus = String(over.id)
-    const statusOpt = STATUS_OPTIONS.find((s) => s.label === newStatus)
+    const statusOpt = statusOptions.find((s) => s.label === newStatus)
     await updateTask(task.id, { status: newStatus, status_color: statusOpt?.color || '#c4c4c4' })
     addToast(`Status changed to "${newStatus}"`)
   }
@@ -175,7 +180,7 @@ export default function KanbanView({ filters, onOpenTask }) {
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex-1 overflow-auto scrollbar-thin bg-gray-50/50 dark:bg-[#111] p-5">
         <div className="flex gap-3 h-full min-h-[400px]">
-          {STATUS_OPTIONS.map((s) => (
+          {kanbanStatuses.map((s) => (
             <KanbanColumn
               key={s.label}
               status={s.label}

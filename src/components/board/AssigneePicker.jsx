@@ -1,10 +1,12 @@
 import { useState, useRef } from 'react'
 import Dropdown from '../ui/Dropdown'
 import Avatar from '../ui/Avatar'
+import { useAuthStore } from '../../stores/useAuthStore'
 
 export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate, canEdit = false }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
+  const { user } = useAuthStore()
   const assignee = profiles.find((p) => p.id === assigneeId)
 
   const handleSelect = (profile) => {
@@ -12,17 +14,8 @@ export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate,
     onUpdate(taskId, { assignee_id: profile ? profile.id : null })
   }
 
-  if (!canEdit) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        {assignee ? (
-          <Avatar name={assignee.full_name} color={assignee.avatar_color} size="sm" />
-        ) : (
-          <div className="w-7 h-7 rounded-full border border-dashed border-gray-200 flex items-center justify-center" />
-        )}
-      </div>
-    )
-  }
+  // For normal users: show current assignee + allow self-assign only (other users hidden)
+  const pickerProfiles = canEdit ? profiles : profiles.filter((p) => p.id === user?.id)
 
   return (
     <div className="relative flex items-center justify-center h-full">
@@ -47,7 +40,8 @@ export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate,
         <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-[#333]">
           Assign to
         </div>
-        {assigneeId && (
+        {/* Admin can unassign anyone; normal user can only unassign themselves */}
+        {assigneeId && (canEdit || assigneeId === user?.id) && (
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleSelect(null)}
@@ -59,7 +53,7 @@ export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate,
             Unassign
           </button>
         )}
-        {profiles.map((profile) => (
+        {pickerProfiles.map((profile) => (
           <button
             key={profile.id}
             onMouseDown={(e) => e.preventDefault()}

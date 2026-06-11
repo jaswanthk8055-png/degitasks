@@ -139,7 +139,7 @@ export default function TaskRow({
 
       {/* Assignee */}
       <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('assignee')}>
-        <AssigneePicker assigneeId={task.assignee_id} profiles={profiles} taskId={task.id} onUpdate={onUpdate} canEdit={canEdit} />
+        <AssigneePicker assigneeId={task.assignee_id} profiles={profiles} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Due Date */}

@@ -206,7 +206,6 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
               profiles={profiles}
               taskId={task.id}
               onUpdate={onUpdate}
-              canEdit={canEdit}
             />
           </FieldRow>
           <FieldRow label="Due Date">

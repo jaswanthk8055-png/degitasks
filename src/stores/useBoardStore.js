@@ -113,10 +113,13 @@ export const useBoardStore = create((set, get) => ({
       supabase.from('sub_groups').select('*').eq('board_id', boardId).order('position'),
     ])
 
-    // Fetch profiles directly by user IDs — avoids workspace_members join being blocked by RLS
+    // Collect user IDs from workspace_members (may be limited by RLS)
+    // + all assignee IDs from tasks (always visible) to ensure we load every assignee's profile
     const memberIds = membersRes.data?.map((m) => m.user_id).filter(Boolean) ?? []
-    const { data: profilesData } = memberIds.length > 0
-      ? await supabase.from('profiles').select('*').in('id', memberIds)
+    const assigneeIds = tasksRes.data?.map((t) => t.assignee_id).filter(Boolean) ?? []
+    const allUserIds = [...new Set([...memberIds, ...assigneeIds])]
+    const { data: profilesData } = allUserIds.length > 0
+      ? await supabase.from('profiles').select('*').in('id', allUserIds)
       : { data: [] }
     const profilesRes = { data: profilesData ?? [] }
 

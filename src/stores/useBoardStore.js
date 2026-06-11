@@ -108,12 +108,17 @@ export const useBoardStore = create((set, get) => ({
     const [groupsRes, tasksRes, membersRes, columnsRes, subGroupsRes] = await Promise.all([
       supabase.from('groups').select('*').eq('board_id', boardId).order('position'),
       supabase.from('tasks').select('*').eq('board_id', boardId).order('position'),
-      supabase.from('workspace_members').select('profiles(*)').eq('workspace_id', workspaceId),
+      supabase.from('workspace_members').select('user_id').eq('workspace_id', workspaceId),
       supabase.from('board_columns').select('*').eq('board_id', boardId).order('position'),
       supabase.from('sub_groups').select('*').eq('board_id', boardId).order('position'),
     ])
 
-    const profilesRes = { data: membersRes.data?.map((m) => m.profiles).filter(Boolean) ?? [] }
+    // Fetch profiles directly by user IDs — avoids workspace_members join being blocked by RLS
+    const memberIds = membersRes.data?.map((m) => m.user_id).filter(Boolean) ?? []
+    const { data: profilesData } = memberIds.length > 0
+      ? await supabase.from('profiles').select('*').in('id', memberIds)
+      : { data: [] }
+    const profilesRes = { data: profilesData ?? [] }
 
     // Fetch column values for all tasks in this board
     let taskColumnValues = {}

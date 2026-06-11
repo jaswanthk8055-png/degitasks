@@ -131,11 +131,11 @@ export default function BoardPage() {
       )}
 
       {activeView === 'Summary' && (
-        <KanbanView onOpenTask={handleOpenTask} />
+        <KanbanView filters={filters} onOpenTask={handleOpenTask} />
       )}
 
       {activeView === 'Calendar' && (
-        <CalendarView onOpenTask={handleOpenTask} />
+        <CalendarView filters={filters} onOpenTask={handleOpenTask} />
       )}
 
       {liveSelectedTask && (

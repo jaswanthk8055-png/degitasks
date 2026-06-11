@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import Dropdown from '../ui/Dropdown'
 import Avatar from '../ui/Avatar'
 
-export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate }) {
+export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate, canEdit = false }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const assignee = profiles.find((p) => p.id === assigneeId)
@@ -10,6 +10,18 @@ export default function AssigneePicker({ assigneeId, profiles, taskId, onUpdate 
   const handleSelect = (profile) => {
     setOpen(false)
     onUpdate(taskId, { assignee_id: profile ? profile.id : null })
+  }
+
+  if (!canEdit) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        {assignee ? (
+          <Avatar name={assignee.full_name} color={assignee.avatar_color} size="sm" />
+        ) : (
+          <div className="w-7 h-7 rounded-full border border-dashed border-gray-200 flex items-center justify-center" />
+        )}
+      </div>
+    )
   }
 
   return (

@@ -21,12 +21,11 @@ function collisionDetectionStrategy(args) {
   return closestCenter(args)
 }
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { isThisWeek, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { useToastStore } from '../../stores/useToastStore'
-import { STATUS_OPTIONS, PRIORITY_OPTIONS, avatarColorFromName } from '../../lib/utils'
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, avatarColorFromName, applyTaskFilters } from '../../lib/utils'
 import TaskGroup from './TaskGroup'
 import TaskRow from './TaskRow'
 
@@ -305,17 +304,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     addToast('Group deleted', 'error')
   }
 
-  const filterTask = (task) => {
-    if (!filters) return true
-    if (filters.assigneeIds.length > 0 && !filters.assigneeIds.includes(task.assignee_id)) return false
-    if (filters.statuses.length > 0   && !filters.statuses.includes(task.status))          return false
-    if (filters.priorities.length > 0 && !filters.priorities.includes(task.priority))      return false
-    if (filters.dueThisWeek) {
-      if (!task.due_date) return false
-      try { if (!isThisWeek(parseISO(task.due_date), { weekStartsOn: 1 })) return false } catch { return false }
-    }
-    return true
-  }
+  const filterTask = (task) => applyTaskFilters([task], filters).length > 0
 
   const sortedGroups   = [...groups].sort((a, b) => a.position - b.position)
   const visibleColumns = boardColumns.filter((c) => !c.hidden)

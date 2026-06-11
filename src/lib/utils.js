@@ -1,4 +1,4 @@
-import { format, isToday, isTomorrow, isYesterday, parseISO } from 'date-fns'
+import { format, isToday, isTomorrow, isYesterday, isThisWeek, parseISO } from 'date-fns'
 
 export const GROUP_COLORS = [
   '#0073ea', '#00c875', '#e2445c', '#fdab3d', '#9d50dd',
@@ -80,6 +80,20 @@ export const AVATAR_COLORS = [
   '#0073ea', '#00c875', '#e2445c', '#fdab3d', '#9d50dd',
   '#037f4c', '#ff7575', '#0086c0', '#bb3354', '#7e3af2',
 ]
+
+export function applyTaskFilters(tasks, filters) {
+  if (!filters) return tasks
+  return tasks.filter((task) => {
+    if (filters.assigneeIds.length > 0 && !filters.assigneeIds.includes(task.assignee_id)) return false
+    if (filters.statuses.length > 0    && !filters.statuses.includes(task.status))          return false
+    if (filters.priorities.length > 0  && !filters.priorities.includes(task.priority))      return false
+    if (filters.dueThisWeek) {
+      if (!task.due_date) return false
+      try { if (!isThisWeek(parseISO(task.due_date), { weekStartsOn: 1 })) return false } catch { return false }
+    }
+    return true
+  })
+}
 
 export function avatarColorFromName(name) {
   if (!name) return AVATAR_COLORS[0]

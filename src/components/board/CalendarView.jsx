@@ -12,10 +12,11 @@ import {
   isSameDay,
 } from 'date-fns'
 import { useBoardStore } from '../../stores/useBoardStore'
+import { applyTaskFilters } from '../../lib/utils'
 
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-export default function CalendarView({ onOpenTask }) {
+export default function CalendarView({ filters, onOpenTask }) {
   const { tasks } = useBoardStore()
   const [current, setCurrent] = useState(new Date())
 
@@ -25,8 +26,9 @@ export default function CalendarView({ onOpenTask }) {
   const calEnd = endOfWeek(monthEnd)
   const days = eachDayOfInterval({ start: calStart, end: calEnd })
 
-  const tasksWithDate = useMemo(() => tasks.filter((t) => !!t.due_date), [tasks])
-  const tasksWithoutDate = useMemo(() => tasks.filter((t) => !t.due_date), [tasks])
+  const filteredTasks = useMemo(() => applyTaskFilters(tasks, filters), [tasks, filters])
+  const tasksWithDate = useMemo(() => filteredTasks.filter((t) => !!t.due_date), [filteredTasks])
+  const tasksWithoutDate = useMemo(() => filteredTasks.filter((t) => !t.due_date), [filteredTasks])
 
   const getTasksForDay = (day) =>
     tasksWithDate.filter((t) => {

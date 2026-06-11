@@ -79,8 +79,8 @@ export default function TaskRow({
       {/* Group color bar */}
       <div className="w-0.5 flex-shrink-0" style={{ backgroundColor: groupColor }} />
 
-      {/* Drag handle + checkbox — fixed 40px */}
-      <div className="w-10 h-9 flex items-center justify-center gap-1 flex-shrink-0">
+      {/* Drag handle — fixed 40px */}
+      <div className="w-10 h-9 flex items-center justify-center flex-shrink-0">
         {canEdit && (
           <button
             {...attributes}
@@ -95,7 +95,6 @@ export default function TaskRow({
             </svg>
           </button>
         )}
-        <input type="checkbox" className="w-3 h-3 cursor-pointer accent-primary-blue" />
       </div>
 
       {/* Task title — click to edit inline; click ">" to open detail panel */}
@@ -140,7 +139,7 @@ export default function TaskRow({
 
       {/* Assignee */}
       <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('assignee')}>
-        <AssigneePicker assigneeId={task.assignee_id} profiles={profiles} taskId={task.id} onUpdate={onUpdate} />
+        <AssigneePicker assigneeId={task.assignee_id} profiles={profiles} taskId={task.id} onUpdate={onUpdate} canEdit={canEdit} />
       </div>
 
       {/* Due Date */}

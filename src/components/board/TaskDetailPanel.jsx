@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
-import { useAuthStore } from '../../stores/useAuthStore'
+import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { useBoardStore } from '../../stores/useBoardStore'
 import StatusPill from './StatusPill'
 import AssigneePicker from './AssigneePicker'
@@ -10,8 +10,9 @@ import PriorityPill from './PriorityPill'
 import Avatar from '../ui/Avatar'
 
 export default function TaskDetailPanel({ task, onClose, onUpdate }) {
-  const { profile } = useAuthStore()
+  const { profile, user } = useAuthStore()
   const { profiles, currentBoard, workspaceId, logActivity } = useBoardStore()
+  const canEdit = user?.email === SUPER_USER_EMAIL
 
   const [description, setDescription] = useState(task?.description || '')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -205,6 +206,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
               profiles={profiles}
               taskId={task.id}
               onUpdate={onUpdate}
+              canEdit={canEdit}
             />
           </FieldRow>
           <FieldRow label="Due Date">

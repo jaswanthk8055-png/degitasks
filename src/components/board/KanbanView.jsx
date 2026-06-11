@@ -11,7 +11,7 @@ import {
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useToastStore } from '../../stores/useToastStore'
-import { STATUS_OPTIONS, PRIORITY_OPTIONS, formatDueDate } from '../../lib/utils'
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, formatDueDate, applyTaskFilters } from '../../lib/utils'
 import Avatar from '../ui/Avatar'
 
 // ── Droppable column ────────────────────────────────────────────────
@@ -124,7 +124,7 @@ function GhostCard({ task }) {
 }
 
 // ── Main export ──────────────────────────────────────────────────────
-export default function KanbanView({ onOpenTask }) {
+export default function KanbanView({ filters, onOpenTask }) {
   const { tasks, groups, profiles, createTask, updateTask, currentBoard } = useBoardStore()
   const { profile } = useAuthStore()
   const { addToast } = useToastStore()
@@ -135,15 +135,16 @@ export default function KanbanView({ onOpenTask }) {
   )
 
   const tasksByStatus = useMemo(() => {
+    const filtered = applyTaskFilters(tasks, filters)
     const map = {}
     STATUS_OPTIONS.forEach((s) => { map[s.label] = [] })
-    tasks.forEach((t) => {
+    filtered.forEach((t) => {
       const key = t.status || 'Not Started'
       if (map[key]) map[key].push(t)
       else map['Not Started'].push(t)
     })
     return map
-  }, [tasks])
+  }, [tasks, filters])
 
   const handleDragStart = ({ active }) => {
     setActiveDragTask(tasks.find((t) => t.id === active.id) || null)

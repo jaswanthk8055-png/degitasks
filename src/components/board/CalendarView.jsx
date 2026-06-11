@@ -26,7 +26,10 @@ export default function CalendarView({ filters, onOpenTask }) {
   const calEnd = endOfWeek(monthEnd)
   const days = eachDayOfInterval({ start: calStart, end: calEnd })
 
-  const filteredTasks = useMemo(() => applyTaskFilters(tasks, filters), [tasks, filters])
+  const filteredTasks = useMemo(
+    () => applyTaskFilters(tasks, filters).filter((t) => t.status !== 'Done'),
+    [tasks, filters]
+  )
   const tasksWithDate = useMemo(() => filteredTasks.filter((t) => !!t.due_date), [filteredTasks])
   const tasksWithoutDate = useMemo(() => filteredTasks.filter((t) => !t.due_date), [filteredTasks])
 

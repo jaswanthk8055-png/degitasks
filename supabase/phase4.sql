@@ -35,27 +35,39 @@ CREATE POLICY "pending_inv_select" ON public.pending_invitations
 
 -- Allow the service role (Edge Function) to delete processed invitations
 CREATE POLICY "pending_inv_delete" ON public.pending_invitations
-  FOR DELETE USING (true); -- service role bypasses RLS anyway
+  FOR DELETE USING (true);
 
 -- ── Trigger: auto-add user to workspace when they sign up with a pending invite ──
+-- NOTE: The trigger fires on public.profiles INSERT (id = auth user id).
+--       profiles has no email column, so we look it up from auth.users.
 CREATE OR REPLACE FUNCTION public.handle_pending_invitation()
 RETURNS trigger AS $$
 DECLARE
-  inv RECORD;
+  inv        RECORD;
+  user_email text;
 BEGIN
-  -- Look up any pending invitations for the new user's email
+  -- Resolve the email from auth.users using the profile id
+  SELECT email INTO user_email
+  FROM auth.users
+  WHERE id = NEW.id;
+
+  IF user_email IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Check for any pending invitations for this email
   FOR inv IN
     SELECT workspace_id FROM public.pending_invitations
-    WHERE email = NEW.email
+    WHERE email = lower(user_email)
   LOOP
-    -- Add them as a workspace member (ignore if already member)
+    -- Add them as a workspace member (ignore if already a member)
     INSERT INTO public.workspace_members (workspace_id, user_id, role)
     VALUES (inv.workspace_id, NEW.id, 'member')
     ON CONFLICT DO NOTHING;
 
-    -- Clean up the invitation
+    -- Clean up the processed invitation
     DELETE FROM public.pending_invitations
-    WHERE email = NEW.email AND workspace_id = inv.workspace_id;
+    WHERE email = lower(user_email) AND workspace_id = inv.workspace_id;
   END LOOP;
 
   RETURN NEW;

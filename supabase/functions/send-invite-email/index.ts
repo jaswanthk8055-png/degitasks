@@ -10,7 +10,7 @@ const APP_URL              = Deno.env.get('APP_URL') ?? 'https://degitasks.com'
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
   'Content-Type': 'application/json',
 }
 

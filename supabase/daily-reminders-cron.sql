@@ -1,34 +1,31 @@
 -- Daily task reminder cron job
 -- Runs at 03:00 UTC = 08:30 AM IST every day.
--- Prerequisites:
---   1. Deploy the Edge Function:  supabase functions deploy send-daily-reminders
---   2. Set secrets:
---        supabase secrets set RESEND_API_KEY=re_xxxx
---        supabase secrets set FROM_EMAIL="DegiTasks <no-reply@yourdomain.com>"
---        supabase secrets set APP_URL="https://your-app-url.com"
---   3. Run this SQL in Supabase SQL Editor.
+-- Run this in Supabase SQL Editor AFTER deploying the send-daily-reminders Edge Function.
 
 -- Enable pg_cron and pg_net extensions (required once per project)
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Remove old job if it exists
-SELECT cron.unschedule('send-daily-reminders') WHERE EXISTS (
-  SELECT 1 FROM cron.job WHERE jobname = 'send-daily-reminders'
-);
+-- Remove old job if it already exists (safe to re-run)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'send-daily-reminders') THEN
+    PERFORM cron.unschedule('send-daily-reminders');
+  END IF;
+END $$;
 
--- Schedule the cron job: 03:00 UTC = 08:30 AM IST
+-- Schedule the cron job: 03:00 UTC = 08:30 AM IST, every day
 SELECT cron.schedule(
   'send-daily-reminders',
   '0 3 * * *',
   $$
   SELECT net.http_post(
-    url    := current_setting('app.supabase_url') || '/functions/v1/send-daily-reminders',
+    url     := 'https://lnnsrocwsdpwojqavcqp.supabase.co/functions/v1/send-daily-reminders',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
-      'Authorization', 'Bearer ' || current_setting('app.supabase_anon_key')
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxubnNyb2N3c2Rwd29qcWF2Y3FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDMxNzcsImV4cCI6MjA5NjU3OTE3N30.OEoplIsoeGf--pg2kEqUvC-AI6Vpv1HaTqRb_bzo9r8'
     ),
-    body   := '{}'::jsonb
+    body    := '{}'::jsonb
   );
   $$
 );

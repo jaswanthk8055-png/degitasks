@@ -439,7 +439,7 @@ export default function TaskGroup({
               <button type="submit" disabled={!newSGName.trim()} className="text-[10px] text-primary-blue font-medium disabled:opacity-40">Add</button>
               <button type="button" onClick={() => { setAddingSubGroup(false); setNewSGName('') }} className="text-[10px] text-gray-400">Cancel</button>
             </form>
-          ) : !isVirtual ? (
+          ) : !isVirtual && !hideAddTask ? (
             <div
               className="flex items-center gap-2 pl-6 pr-3 h-7 hover:bg-gray-50 dark:hover:bg-[#1d1d1d] transition cursor-pointer group/addsg border-b border-border-color dark:border-[#2a2a2a] opacity-0 hover:opacity-100 focus-within:opacity-100"
               style={{ borderLeft: `3px solid ${group.color}` }}

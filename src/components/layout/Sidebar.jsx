@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useBoardStore } from '../../stores/useBoardStore'
@@ -6,6 +6,10 @@ import { useThemeStore } from '../../stores/useThemeStore'
 import { supabase } from '../../lib/supabase'
 import Avatar from '../ui/Avatar'
 import Modal from '../ui/Modal'
+
+const SUPABASE_FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL
+  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+  : ''
 
 const BOARD_ICONS = ['📋', '🚀', '⭐', '🎯', '💡', '🔥', '📊', '🛠️', '🎨', '📌']
 const BOARD_COLORS = ['#0073ea', '#00c875', '#e2445c', '#fdab3d', '#9d50dd', '#00c2cd']
@@ -26,12 +30,41 @@ export default function Sidebar({
   const navigate = useNavigate()
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true')
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = parseInt(localStorage.getItem('sidebar-width') || '0', 10)
+    return saved >= 180 && saved <= 480 ? saved : 240
+  })
+  const dragRef = useRef(null)
 
   const toggleCollapsed = () => {
     const next = !collapsed
     setCollapsed(next)
     localStorage.setItem('sidebar-collapsed', String(next))
   }
+
+  const handleResizeMouseDown = useCallback((e) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    dragRef.current = { startX: e.clientX, startW: sidebarWidth }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMove = (mv) => {
+      if (!dragRef.current) return
+      const newW = Math.max(180, Math.min(480, dragRef.current.startW + (mv.clientX - dragRef.current.startX)))
+      setSidebarWidth(newW)
+      localStorage.setItem('sidebar-width', String(newW))
+    }
+    const onUp = () => {
+      dragRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [sidebarWidth])
 
   const [newBoardModal, setNewBoardModal] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
@@ -123,8 +156,8 @@ export default function Sidebar({
         email_input: inviteEmail.trim().toLowerCase(),
       })
       if (error || !data || data.length === 0) {
-        setInviteStatus('notfound')
-        setInviteMsg('No account found with that email.')
+        // No account found — send a signup invitation email
+        await sendSignupInvite(inviteEmail.trim().toLowerCase())
       } else {
         const targetUser = data[0]
         if (workspaceMembers.some((m) => m.id === targetUser.id)) {
@@ -150,6 +183,32 @@ export default function Sidebar({
     }
   }
 
+  const sendSignupInvite = async (email) => {
+    try {
+      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/send-invite-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          workspaceId: workspace.id,
+          workspaceName: workspace.name,
+          inviterName: profile?.full_name ?? 'A colleague',
+        }),
+      })
+      if (res.ok) {
+        setInviteStatus('success')
+        setInviteMsg(`No account found — a signup invitation has been sent to ${email}.`)
+        setInviteEmail('')
+      } else {
+        setInviteStatus('error')
+        setInviteMsg('Failed to send invite email. Please try again.')
+      }
+    } catch {
+      setInviteStatus('error')
+      setInviteMsg('Failed to send invite email. Please check your connection.')
+    }
+  }
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
@@ -167,14 +226,17 @@ export default function Sidebar({
   return (
     <>
       {/* Desktop: static sidebar | Mobile: fixed drawer */}
-      <aside className={`
-        bg-sidebar-bg flex flex-col h-full overflow-hidden transition-all duration-200
-        md:relative md:flex-shrink-0 md:translate-x-0
-        fixed inset-y-0 left-0 z-50
-        ${collapsed ? 'md:w-14' : 'md:w-60'}
-        w-64
-        ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
+      <aside
+        className={`
+          bg-sidebar-bg flex flex-col h-full overflow-hidden
+          md:relative md:flex-shrink-0 md:translate-x-0
+          fixed inset-y-0 left-0 z-50
+          w-64
+          ${collapsed ? 'md:w-14' : ''}
+          ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+        style={collapsed ? undefined : { width: sidebarWidth, minWidth: sidebarWidth }}
+      >
         {/* Logo + collapse toggle */}
         {collapsed ? (
           <div className="py-3 flex flex-col items-center gap-1">
@@ -395,6 +457,17 @@ export default function Sidebar({
             </div>
           )}
         </div>
+
+        {/* Drag-to-resize handle — only on desktop, only when expanded */}
+        {!collapsed && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="hidden md:flex absolute top-0 right-0 h-full w-1.5 cursor-col-resize items-center justify-center group/resize z-10 hover:bg-primary-blue/20 transition-colors"
+            title="Drag to resize"
+          >
+            <div className="w-0.5 h-12 rounded-full bg-gray-600 opacity-0 group-hover/resize:opacity-100 transition-opacity" />
+          </div>
+        )}
       </aside>
 
       {/* ── New Board Modal ── */}
@@ -528,6 +601,7 @@ export default function Sidebar({
               placeholder="colleague@company.com"
               className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue dark:bg-[#252525] dark:border-[#444] dark:text-white"
             />
+            <p className="mt-1.5 text-[11px] text-gray-400">If they don't have an account yet, a signup invitation email will be sent.</p>
           </div>
           {inviteStatus && (
             <div className={`text-sm px-3 py-2.5 rounded-lg ${inviteStatus === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
@@ -573,7 +647,7 @@ export default function Sidebar({
               disabled={inviting || !inviteEmail.trim()}
               className="px-4 py-2 text-sm text-white bg-primary-blue hover:bg-blue-600 rounded-lg transition disabled:opacity-50"
             >
-              {inviting ? 'Adding…' : 'Add member'}
+              {inviting ? 'Sending…' : 'Add / Invite'}
             </button>
           </div>
         </form>

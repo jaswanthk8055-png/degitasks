@@ -99,8 +99,8 @@ export const useBoardStore = create((set, get) => ({
   },
 
   // ─── Groups ───────────────────────────────────────────────────────
-  fetchBoardData: async (boardId) => {
-    set({ loading: true })
+  fetchBoardData: async (boardId, silent = false) => {
+    if (!silent) set({ loading: true })
 
     const boardRes = await supabase.from('boards').select('*').eq('id', boardId).single()
     const workspaceId = boardRes.data?.workspace_id

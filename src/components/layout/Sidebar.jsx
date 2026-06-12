@@ -7,9 +7,6 @@ import { supabase } from '../../lib/supabase'
 import Avatar from '../ui/Avatar'
 import Modal from '../ui/Modal'
 
-const SUPABASE_FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL
-  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
-  : ''
 
 const BOARD_ICONS = ['📋', '🚀', '⭐', '🎯', '💡', '🔥', '📊', '🛠️', '🎨', '📌']
 const BOARD_COLORS = ['#0073ea', '#00c875', '#e2445c', '#fdab3d', '#9d50dd', '#00c2cd']
@@ -185,25 +182,25 @@ export default function Sidebar({
 
   const sendSignupInvite = async (email) => {
     try {
-      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/send-invite-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { error } = await supabase.functions.invoke('send-invite-email', {
+        body: {
           email,
           workspaceId: workspace.id,
           workspaceName: workspace.name,
           inviterName: profile?.full_name ?? 'A colleague',
-        }),
+        },
       })
-      if (res.ok) {
+      if (error) {
+        console.error('Invite function error:', error)
+        setInviteStatus('error')
+        setInviteMsg('Failed to send invite email. Please try again.')
+      } else {
         setInviteStatus('success')
         setInviteMsg(`No account found — a signup invitation has been sent to ${email}.`)
         setInviteEmail('')
-      } else {
-        setInviteStatus('error')
-        setInviteMsg('Failed to send invite email. Please try again.')
       }
-    } catch {
+    } catch (err) {
+      console.error('Invite error:', err)
       setInviteStatus('error')
       setInviteMsg('Failed to send invite email. Please check your connection.')
     }

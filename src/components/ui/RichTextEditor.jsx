@@ -9,7 +9,7 @@ const FORMATS = [
 
 export default function RichTextEditor({ value, onChange, placeholder, readOnly = false }) {
   const editorRef    = useRef(null)
-  const lastEmitted  = useRef(value || '')
+  const lastEmitted  = useRef(null)
   const [active, setActive] = useState({ bold: false, italic: false, underline: false, strikeThrough: false })
 
   // Sync value → innerHTML only when it changes externally (e.g. different task opened)

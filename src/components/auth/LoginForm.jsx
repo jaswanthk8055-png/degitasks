@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import * as microsoftTeams from '@microsoft/teams-js'
 import { useAuthStore } from '../../stores/useAuthStore'
 
 export default function LoginForm() {
@@ -16,6 +17,16 @@ export default function LoginForm() {
     setLoading(true)
     try {
       await signIn(email, password)
+      // If opened as a Teams auth popup, signal success and let Teams close the window
+      if (new URLSearchParams(window.location.search).get('teams_popup') === 'true') {
+        try {
+          await microsoftTeams.app.initialize()
+          microsoftTeams.authentication.notifySuccess()
+        } catch {
+          window.close()
+        }
+        return
+      }
       navigate('/')
     } catch (err) {
       setError(err.message || 'Invalid email or password')

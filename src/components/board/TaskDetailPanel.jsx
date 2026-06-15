@@ -8,6 +8,7 @@ import AssigneePicker from './AssigneePicker'
 import DatePicker from './DatePicker'
 import PriorityPill from './PriorityPill'
 import Avatar from '../ui/Avatar'
+import RichTextEditor from '../ui/RichTextEditor'
 
 export default function TaskDetailPanel({ task, onClose, onUpdate }) {
   const { profile, user } = useAuthStore()
@@ -226,13 +227,11 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
 
         {/* Description */}
         <div className="px-5 py-4 border-b border-border-color">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Description</h3>
-          <textarea
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Description</h3>
+          <RichTextEditor
             value={description}
-            onChange={(e) => handleDescriptionChange(e.target.value)}
+            onChange={handleDescriptionChange}
             placeholder="Add a description..."
-            className="w-full text-sm text-gray-700 placeholder-gray-400 resize-none border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent min-h-[80px]"
-            rows={4}
           />
         </div>
 

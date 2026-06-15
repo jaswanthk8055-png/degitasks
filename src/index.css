@@ -114,3 +114,15 @@
   background-color: #1e1e1e;
   border-color: #333333;
 }
+
+/* ── Rich text editor ── */
+.rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+.dark .rich-editor:empty::before { color: #6b7280; }
+.rich-editor b, .rich-editor strong { font-weight: 700; }
+.rich-editor i, .rich-editor em    { font-style: italic; }
+.rich-editor u                     { text-decoration: underline; }
+.rich-editor s, .rich-editor strike { text-decoration: line-through; }

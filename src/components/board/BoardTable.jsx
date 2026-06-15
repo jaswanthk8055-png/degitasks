@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import Modal from '../ui/Modal'
 import {
   DndContext,
   closestCenter,
@@ -294,9 +295,16 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     return task
   }
 
-  const handleDeleteTask = async (taskId) => {
-    await deleteTask(taskId)
+  const [taskToDelete, setTaskToDelete] = useState(null)
+
+  const handleDeleteTask = (taskId) => {
+    setTaskToDelete(taskId)
+  }
+
+  const confirmDeleteTask = async () => {
+    await deleteTask(taskToDelete)
     addToast('Task deleted', 'error')
+    setTaskToDelete(null)
   }
 
   const handleDeleteGroup = async (groupId) => {
@@ -417,6 +425,31 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
           )}
         </div>
       </div>
+
+      {/* Delete Task Confirmation */}
+      <Modal open={!!taskToDelete} onClose={() => setTaskToDelete(null)} title="Delete task">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+          Are you sure you want to delete{' '}
+          <span className="font-semibold">
+            {tasks.find((t) => t.id === taskToDelete)?.title || 'this task'}
+          </span>
+          ? This action cannot be undone.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={() => setTaskToDelete(null)}
+            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-[#333] dark:text-gray-300 dark:hover:bg-[#3a3a3a] rounded-lg transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmDeleteTask}
+            className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition"
+          >
+            Delete task
+          </button>
+        </div>
+      </Modal>
 
       {/* Drag overlay */}
       <DragOverlay>

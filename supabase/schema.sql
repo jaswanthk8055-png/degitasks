@@ -13,6 +13,7 @@
     id          uuid primary key references auth.users on delete cascade,
     full_name   text,
     avatar_color text default '#0073ea',
+    default_page text default 'Main Table',
     created_at  timestamptz default now()
   );
 

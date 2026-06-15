@@ -1,0 +1,51 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "e833fac6-72a2-4411-9bb7-626797a2b066",
+  "developer": {
+    "name": "Degi Trans Pvt Ltd",
+    "websiteUrl": "https://degitasks.degitrans.com",
+    "privacyUrl": "https://degitasks.degitrans.com/privacy",
+    "termsOfUseUrl": "https://degitasks.degitrans.com/terms"
+  },
+  "name": {
+    "short": "DegiTask",
+    "full": "DegiTask — Degi Trans Task Manager"
+  },
+  "description": {
+    "short": "Team task management for Degi Trans",
+    "full": "DegiTask is the collaborative task board for Degi Trans Pvt Ltd. Create tasks, assign to team members, track progress and deadlines in real time."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#0073ea",
+  "staticTabs": [
+    {
+      "entityId": "my-tasks",
+      "name": "My Tasks",
+      "contentUrl": "https://degitasks.degitrans.com/my-work?teams=true",
+      "websiteUrl": "https://degitasks.degitrans.com/my-work",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "dashboard",
+      "name": "Dashboard",
+      "contentUrl": "https://degitasks.degitrans.com/tv?teams=true",
+      "websiteUrl": "https://degitasks.degitrans.com/tv",
+      "scopes": ["personal"]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://degitasks.degitrans.com/teams-config",
+      "canUpdateConfiguration": true,
+      "scopes": ["team", "groupChat"]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["degitasks.degitrans.com"],
+  "showLoadingIndicator": true
+}

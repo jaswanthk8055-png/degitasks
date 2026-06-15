@@ -15,6 +15,7 @@ export default function ProfilePage() {
 
   const [fullName, setFullName] = useState(profile?.full_name || '')
   const [avatarColor, setAvatarColor] = useState(profile?.avatar_color || '#0073ea')
+  const [defaultPage, setDefaultPage] = useState(profile?.default_page || 'Main Table')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState(null)
 
@@ -31,7 +32,7 @@ export default function ProfilePage() {
     setSaving(true)
     setSaveMsg(null)
     try {
-      await updateProfile({ full_name: fullName.trim(), avatar_color: avatarColor })
+      await updateProfile({ full_name: fullName.trim(), avatar_color: avatarColor, default_page: defaultPage })
       setSaveMsg({ type: 'success', text: 'Profile updated successfully.' })
     } catch {
       setSaveMsg({ type: 'error', text: 'Failed to save. Please try again.' })
@@ -149,6 +150,22 @@ export default function ProfilePage() {
                 />
               ))}
             </div>
+          </div>
+
+          {/* Default opening page */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+              Default Opening Page
+            </label>
+            <select
+              value={defaultPage}
+              onChange={(e) => setDefaultPage(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-[#444] text-sm text-gray-900 dark:text-white bg-white dark:bg-[#252525] focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent transition appearance-none cursor-pointer"
+            >
+              <option value="Main Table">Main Table</option>
+              <option value="My Tasks">My Tasks</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Choose which view opens when you log in.</p>
           </div>
 
           {saveMsg && (

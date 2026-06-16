@@ -1,19 +1,16 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBoardStore } from '../stores/useBoardStore'
-import { useAuthStore } from '../stores/useAuthStore'
 
 export default function HomePage() {
   const boards = useBoardStore((s) => s.boards)
-  const profile = useAuthStore((s) => s.profile)
   const navigate = useNavigate()
 
   useEffect(() => {
     if (boards.length > 0) {
-      const defaultView = profile?.default_page || 'Main Table'
-      navigate(`/board/${boards[0].id}`, { replace: true, state: { defaultView } })
+      navigate(`/board/${boards[0].id}`, { replace: true })
     }
-  }, [boards, profile, navigate])
+  }, [boards, navigate])
 
   return (
     <div className="flex-1 flex items-center justify-center">

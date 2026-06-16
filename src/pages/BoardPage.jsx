@@ -22,7 +22,7 @@ export default function BoardPage() {
   const { profile } = useAuthStore()
   const { addToast } = useToastStore()
 
-  const [activeView,       setActiveView]       = useState(location.state?.defaultView || 'Main Table')
+  const [activeView,       setActiveView]       = useState(profile?.default_page || 'Main Table')
   const [selectedTask,     setSelectedTask]     = useState(null)
   const [filters,          setFilters]          = useState(EMPTY_FILTERS)
   const [filterOpen,       setFilterOpen]       = useState(false)

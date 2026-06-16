@@ -14,6 +14,7 @@ import DashboardPage from './pages/DashboardPage'
 import NotFoundPage from './pages/NotFoundPage'
 import ProfilePage from './pages/ProfilePage'
 import TeamsConfigPage from './pages/TeamsConfigPage'
+import TeamsAuthSuccessPage from './pages/TeamsAuthSuccessPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 import { initializeTeams, notifyTeamsAppLoaded, getTeamsTheme } from './lib/teams'
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/teams-config" element={<TeamsConfigPage />} />
+        <Route path="/teams-auth-success" element={<TeamsAuthSuccessPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
 

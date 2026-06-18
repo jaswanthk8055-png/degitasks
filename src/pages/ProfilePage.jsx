@@ -16,6 +16,8 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(profile?.full_name || '')
   const [avatarColor, setAvatarColor] = useState(profile?.avatar_color || '#0073ea')
   const [defaultPage, setDefaultPage] = useState(profile?.default_page || 'Main Table')
+  const [notifPref, setNotifPref] = useState(profile?.notification_preference || 'email')
+  const [teamsWebhookUrl, setTeamsWebhookUrl] = useState(profile?.teams_webhook_url || '')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState(null)
 
@@ -32,7 +34,13 @@ export default function ProfilePage() {
     setSaving(true)
     setSaveMsg(null)
     try {
-      await updateProfile({ full_name: fullName.trim(), avatar_color: avatarColor, default_page: defaultPage })
+      await updateProfile({
+        full_name: fullName.trim(),
+        avatar_color: avatarColor,
+        default_page: defaultPage,
+        notification_preference: notifPref,
+        teams_webhook_url: teamsWebhookUrl.trim() || null,
+      })
       setSaveMsg({ type: 'success', text: 'Profile updated successfully.' })
     } catch {
       setSaveMsg({ type: 'error', text: 'Failed to save. Please try again.' })
@@ -166,6 +174,53 @@ export default function ProfilePage() {
               <option value="My Tasks">My Tasks</option>
             </select>
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Choose which view opens when you log in.</p>
+          </div>
+
+          {/* Morning reminder notifications */}
+          <div className="border-t border-gray-100 dark:border-[#2a2a2a] pt-5">
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+              Morning Reminder Notifications
+            </label>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+              How you receive your 8:30 AM daily task summary.
+            </p>
+            <div className="flex flex-col gap-2 mb-4">
+              {[
+                { value: 'email',  label: '📧 Email only' },
+                { value: 'teams',  label: '💬 Microsoft Teams only' },
+                { value: 'both',   label: '📧 + 💬 Both' },
+              ].map((opt) => (
+                <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name="notifPref"
+                    value={opt.value}
+                    checked={notifPref === opt.value}
+                    onChange={() => setNotifPref(opt.value)}
+                    className="accent-primary-blue w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {(notifPref === 'teams' || notifPref === 'both') && (
+              <div className="mt-1">
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                  Your Teams Webhook URL
+                </label>
+                <input
+                  type="url"
+                  value={teamsWebhookUrl}
+                  onChange={(e) => setTeamsWebhookUrl(e.target.value)}
+                  placeholder="https://outlook.office.com/webhook/..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-[#444] text-sm text-gray-900 dark:text-white bg-white dark:bg-[#252525] focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent transition font-mono"
+                />
+                <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
+                  In Microsoft Teams: go to a channel → ··· → Connectors → Incoming Webhook → Configure → copy the URL and paste it above.
+                </p>
+              </div>
+            )}
           </div>
 
           {saveMsg && (

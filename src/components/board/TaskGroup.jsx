@@ -409,7 +409,7 @@ export default function TaskGroup({
                           <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-300 group-hover/sgadd:text-primary-blue transition flex-shrink-0">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
                           </svg>
-                          <span className="text-[11px] text-gray-300 group-hover/sgadd:text-primary-blue transition">+ Add task</span>
+                          <span className="text-[11px] text-gray-300 group-hover/sgadd:text-primary-blue transition">+ Add task to this project</span>
                         </div>
                       )}
                     </>
@@ -441,16 +441,14 @@ export default function TaskGroup({
             </form>
           ) : !isVirtual && !hideAddTask ? (
             <div
-              className="flex items-center gap-2 pl-6 pr-3 h-7 hover:bg-gray-50 dark:hover:bg-[#1d1d1d] transition cursor-pointer group/addsg border-b border-border-color dark:border-[#2a2a2a] opacity-0 hover:opacity-100 focus-within:opacity-100"
+              className="flex items-center gap-2 pl-6 pr-3 h-7 hover:bg-gray-50 dark:hover:bg-[#1d1d1d] transition cursor-pointer group/addsg border-b border-border-color dark:border-[#2a2a2a]"
               style={{ borderLeft: `3px solid ${group.color}` }}
               onClick={() => setAddingSubGroup(true)}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
             >
-              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-300 group-hover/addsg:text-gray-500 transition flex-shrink-0">
+              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-400 group-hover/addsg:text-gray-600 dark:text-gray-500 dark:group-hover/addsg:text-gray-300 transition flex-shrink-0">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
               </svg>
-              <span className="text-[11px] text-gray-300 group-hover/addsg:text-gray-500 transition">+ Add section</span>
+              <span className="text-[11px] text-gray-400 group-hover/addsg:text-gray-600 dark:text-gray-500 dark:group-hover/addsg:text-gray-300 transition">+ Add Project</span>
             </div>
           ) : null}
 

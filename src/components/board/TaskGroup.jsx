@@ -433,7 +433,7 @@ export default function TaskGroup({
                 value={newSGName}
                 onChange={(e) => setNewSGName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Escape') { setAddingSubGroup(false); setNewSGName('') } }}
-                placeholder="Section name…"
+                placeholder="Project name…"
                 className="flex-1 text-xs bg-transparent outline-none border-b border-primary-blue text-gray-700 dark:text-gray-200 py-0.5"
               />
               <button type="submit" disabled={!newSGName.trim()} className="text-[10px] text-primary-blue font-medium disabled:opacity-40">Add</button>

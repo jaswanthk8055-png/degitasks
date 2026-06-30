@@ -84,7 +84,10 @@ export const AVATAR_COLORS = [
 export function applyTaskFilters(tasks, filters) {
   if (!filters) return tasks
   return tasks.filter((task) => {
-    if (filters.assigneeIds.length > 0 && !filters.assigneeIds.includes(task.assignee_id)) return false
+    if (filters.assigneeIds.length > 0) {
+      const taskAssignees = task.assignee_ids?.length ? task.assignee_ids : (task.assignee_id ? [task.assignee_id] : [])
+      if (!filters.assigneeIds.some((id) => taskAssignees.includes(id))) return false
+    }
     if (filters.statuses.length > 0    && !filters.statuses.includes(task.status))          return false
     if (filters.priorities.length > 0  && !filters.priorities.includes(task.priority))      return false
     if (filters.dueThisWeek) {

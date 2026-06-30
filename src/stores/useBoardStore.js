@@ -116,8 +116,9 @@ export const useBoardStore = create((set, get) => ({
     // Collect user IDs from workspace_members (may be limited by RLS)
     // + all assignee IDs from tasks (always visible) to ensure we load every assignee's profile
     const memberIds = membersRes.data?.map((m) => m.user_id).filter(Boolean) ?? []
-    const assigneeIds = tasksRes.data?.map((t) => t.assignee_id).filter(Boolean) ?? []
-    const allUserIds = [...new Set([...memberIds, ...assigneeIds])]
+    const singleAssignees = tasksRes.data?.map((t) => t.assignee_id).filter(Boolean) ?? []
+    const multiAssignees = (tasksRes.data ?? []).flatMap((t) => t.assignee_ids ?? []).filter(Boolean)
+    const allUserIds = [...new Set([...memberIds, ...singleAssignees, ...multiAssignees])]
     const { data: profilesData } = allUserIds.length > 0
       ? await supabase.from('profiles').select('*').in('id', allUserIds)
       : { data: [] }

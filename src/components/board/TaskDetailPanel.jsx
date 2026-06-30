@@ -203,7 +203,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
           </FieldRow>
           <FieldRow label="Assignee">
             <AssigneePicker
-              assigneeId={task.assignee_id}
+              assigneeIds={task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])}
               profiles={profiles}
               taskId={task.id}
               onUpdate={onUpdate}

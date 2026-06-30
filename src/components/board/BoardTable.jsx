@@ -161,23 +161,32 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         }
       }
     }
-    if ('assignee_id' in updates && updates.assignee_id !== prevTask?.assignee_id) {
-      const assigneeName = profiles.find((p) => p.id === updates.assignee_id)?.full_name || 'Unassigned'
-      logActivity({ taskId, userId: profile?.id, action: 'task_assigned', meta: { assignee_name: assigneeName } })
-      if (updates.assignee_id && updates.assignee_id !== profile?.id) {
+    if ('assignee_ids' in updates) {
+      const prevIds = prevTask?.assignee_ids ?? (prevTask?.assignee_id ? [prevTask.assignee_id] : [])
+      const nextIds = updates.assignee_ids ?? []
+      const newlyAdded = nextIds.filter((id) => !prevIds.includes(id))
+      const removed    = prevIds.filter((id) => !nextIds.includes(id))
+
+      const namesAdded = newlyAdded.map((id) => profiles.find((p) => p.id === id)?.full_name).filter(Boolean)
+      if (namesAdded.length) addToast(`Assigned to ${namesAdded.join(', ')}`)
+      else if (removed.length && nextIds.length === 0) addToast('Unassigned')
+
+      const allNames = nextIds.map((id) => profiles.find((p) => p.id === id)?.full_name).filter(Boolean)
+      logActivity({ taskId, userId: profile?.id, action: 'task_assigned', meta: { assignee_name: allNames.join(', ') || 'Unassigned' } })
+
+      for (const assigneeId of newlyAdded) {
+        if (assigneeId === profile?.id) continue
         supabase.from('notifications').insert({
-          user_id: updates.assignee_id,
+          user_id: assigneeId,
           message: `${profile?.full_name || 'Someone'} assigned "${prevTask?.title || 'a task'}" to you`,
           task_id: taskId,
           read: false,
         })
-        addToast(`Assigned to ${assigneeName}`)
-        // Fire-and-forget email — doesn't block the UI
         fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            assigneeId: updates.assignee_id,
+            assigneeId,
             taskTitle: prevTask?.title || 'a task',
             assignerName: profile?.full_name || 'Someone',
             boardName: currentBoard?.name || 'DegiTasks',

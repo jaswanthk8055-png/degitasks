@@ -2,11 +2,12 @@ import { useState, useRef } from 'react'
 import Dropdown from '../ui/Dropdown'
 import Avatar from '../ui/Avatar'
 
-export default function AssigneePicker({ assigneeIds = [], profiles, taskId, onUpdate }) {
+export default function AssigneePicker({ assigneeIds = [], profiles, assignableProfiles, taskId, onUpdate }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
 
   const assigned = profiles.filter((p) => assigneeIds.includes(p.id))
+  const options = assignableProfiles ?? profiles
 
   const toggle = (profile) => {
     const isSelected = assigneeIds.includes(profile.id)
@@ -63,7 +64,7 @@ export default function AssigneePicker({ assigneeIds = [], profiles, taskId, onU
           Assign to
         </div>
 
-        {profiles.map((profile) => {
+        {options.map((profile) => {
           const checked = assigneeIds.includes(profile.id)
           return (
             <button

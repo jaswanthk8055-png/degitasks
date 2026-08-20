@@ -16,6 +16,7 @@ export const useBoardStore = create((set, get) => ({
   tasks: [],
   subGroups: [],
   profiles: [],
+  memberProfiles: [],
   boardColumns: [],
   taskColumnValues: {},    // { taskId: { columnId: value, ... }, ... }
   statusOptions: [],
@@ -123,6 +124,7 @@ export const useBoardStore = create((set, get) => ({
       ? await supabase.from('profiles').select('*').in('id', allUserIds)
       : { data: [] }
     const profilesRes = { data: profilesData ?? [] }
+    const memberProfiles = (profilesRes.data ?? []).filter((p) => memberIds.includes(p.id))
 
     // Fetch column values for all tasks in this board
     let taskColumnValues = {}
@@ -159,6 +161,7 @@ export const useBoardStore = create((set, get) => ({
       tasks: tasksRes.data || [],
       subGroups: subGroupsRes.data || [],
       profiles: profilesRes.data || [],
+      memberProfiles,
       boardColumns: columnsRes.data || [],
       taskColumnValues,
       statusOptions,

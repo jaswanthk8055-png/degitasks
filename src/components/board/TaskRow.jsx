@@ -21,7 +21,7 @@ export default function TaskRow({
   colWidths = COL_DEFAULTS,
 }) {
   const titleInputRef = useRef(null)
-  const { taskColumnValues, updateColumnValue } = useBoardStore()
+  const { taskColumnValues, updateColumnValue, memberProfiles } = useBoardStore()
   const { user } = useAuthStore()
   const canEdit = user?.email === SUPER_USER_EMAIL
 
@@ -139,7 +139,7 @@ export default function TaskRow({
 
       {/* Assignee */}
       <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('assignee')}>
-        <AssigneePicker assigneeIds={task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])} profiles={profiles} taskId={task.id} onUpdate={onUpdate} />
+        <AssigneePicker assigneeIds={task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])} profiles={profiles} assignableProfiles={memberProfiles} taskId={task.id} onUpdate={onUpdate} />
       </div>
 
       {/* Due Date */}

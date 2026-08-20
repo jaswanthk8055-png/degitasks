@@ -12,7 +12,7 @@ import RichTextEditor from '../ui/RichTextEditor'
 
 export default function TaskDetailPanel({ task, onClose, onUpdate }) {
   const { profile, user } = useAuthStore()
-  const { profiles, currentBoard, workspaceId, logActivity } = useBoardStore()
+  const { profiles, memberProfiles, currentBoard, workspaceId, logActivity } = useBoardStore()
   const canEdit = user?.email === SUPER_USER_EMAIL
 
   const [description, setDescription] = useState(task?.description || '')
@@ -205,6 +205,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
             <AssigneePicker
               assigneeIds={task.assignee_ids ?? (task.assignee_id ? [task.assignee_id] : [])}
               profiles={profiles}
+              assignableProfiles={memberProfiles}
               taskId={task.id}
               onUpdate={onUpdate}
             />

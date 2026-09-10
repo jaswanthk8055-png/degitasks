@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, parseISO } from 'date-fns'
 import { supabase } from '../../lib/supabase'
-import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
+import { useAuthStore } from '../../stores/useAuthStore'
 import { useBoardStore } from '../../stores/useBoardStore'
 import StatusPill from './StatusPill'
 import AssigneePicker from './AssigneePicker'
@@ -11,9 +11,9 @@ import Avatar from '../ui/Avatar'
 import RichTextEditor from '../ui/RichTextEditor'
 
 export default function TaskDetailPanel({ task, onClose, onUpdate }) {
-  const { profile, user } = useAuthStore()
-  const { profiles, memberProfiles, currentBoard, workspaceId, logActivity } = useBoardStore()
-  const canEdit = user?.email === SUPER_USER_EMAIL
+  const { profile } = useAuthStore()
+  const { profiles, memberProfiles, logActivity } = useBoardStore()
+  const taskId = task?.id
 
   const [description, setDescription] = useState(task?.description || '')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -25,23 +25,35 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
   const panelRef = useRef(null)
   const descSaveTimer = useRef(null)
 
-  // Sync local state when task changes
+  // The parent keys this panel by task ID so drafts reset when another task opens.
   useEffect(() => {
-    if (task) {
-      setTitleValue(task.title || '')
-      setDescription(task.description || '')
-      fetchComments(task.id)
+    if (!taskId) return
+    let cancelled = false
+    const fetchComments = async () => {
+      const { data } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at')
+      if (data && !cancelled) {
+        setComments(data.map((c) => ({
+          ...c,
+          profile: profiles.find((p) => p.id === c.user_id) || { full_name: 'Unknown', avatar_color: '#c4c4c4' },
+        })))
+      }
     }
-  }, [task?.id])
+    fetchComments()
+    return () => { cancelled = true }
+  }, [taskId, profiles])
 
   // Realtime comments subscription
   useEffect(() => {
-    if (!task) return
+    if (!taskId) return
     const channel = supabase
-      .channel(`task-comments:${task.id}`)
+      .channel(`task-comments:${taskId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'comments', filter: `task_id=eq.${task.id}` },
+        { event: 'INSERT', schema: 'public', table: 'comments', filter: `task_id=eq.${taskId}` },
         (payload) => {
           const commenter = profiles.find((p) => p.id === payload.new.user_id) || {
             full_name: 'Unknown',
@@ -57,7 +69,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
       )
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [task?.id, profiles])
+  }, [taskId, profiles])
 
   // Click-outside to close
   useEffect(() => {
@@ -80,21 +92,6 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
-
-  const fetchComments = async (taskId) => {
-    const { data } = await supabase
-      .from('comments')
-      .select('*')
-      .eq('task_id', taskId)
-      .order('created_at')
-    if (data) {
-      const enriched = data.map((c) => ({
-        ...c,
-        profile: profiles.find((p) => p.id === c.user_id) || { full_name: 'Unknown', avatar_color: '#c4c4c4' },
-      }))
-      setComments(enriched)
-    }
-  }
 
   const commitTitle = () => {
     setEditingTitle(false)

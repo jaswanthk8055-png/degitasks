@@ -10,6 +10,7 @@ import KanbanView from '../components/board/KanbanView'
 import CalendarView from '../components/board/CalendarView'
 import TaskDetailPanel from '../components/board/TaskDetailPanel'
 import AutomationsPanel from '../components/board/AutomationsPanel'
+import { isCompletedTaskGroup } from '../lib/taskGroups'
 
 const EMPTY_FILTERS = { assigneeIds: [], statuses: [], priorities: [], dueThisWeek: false }
 
@@ -19,15 +20,19 @@ export default function BoardPage() {
   const { loading } = useBoard(boardId)
   const { groups, tasks, createTask, createGroup, currentBoard, updateTask, profiles } =
     useBoardStore()
-  const { profile } = useAuthStore()
+  const { profile, user } = useAuthStore()
+  const currentUserId = user?.id || profile?.id
   const { addToast } = useToastStore()
 
   const [activeView,       setActiveView]       = useState(profile?.default_page || 'Main Table')
-  const [selectedTask,     setSelectedTask]     = useState(null)
+  const [selection,        setSelection]        = useState({ locationKey: location.key, task: undefined })
   const [filters,          setFilters]          = useState(EMPTY_FILTERS)
   const [filterOpen,       setFilterOpen]       = useState(false)
   const [automationsOpen,  setAutomationsOpen]  = useState(false)
   const [groupBy,          setGroupBy]          = useState('group')
+  const [newTaskId,        setNewTaskId]        = useState(null)
+  const [creatingTask,     setCreatingTask]     = useState(false)
+  const isMyTasks = activeView === 'My Tasks'
 
   // Update document title when board changes
   useEffect(() => {
@@ -35,31 +40,34 @@ export default function BoardPage() {
     return () => { document.title = 'DegiTasks' }
   }, [currentBoard?.name])
 
-  // Open a specific task if navigated here with state (from CommandPalette)
-  useEffect(() => {
-    if (!location.state?.openTaskId || loading) return
-    const task = tasks.find((t) => t.id === location.state.openTaskId)
-    if (task) setSelectedTask(task)
-  }, [location.state?.openTaskId, loading, tasks.length])
-
+  // Navigation can request a task before the board's tasks have loaded.
+  // An explicit selection (including closing the panel) overrides that request.
+  const explicitSelection = selection.locationKey === location.key ? selection.task : undefined
+  const selectedTask = explicitSelection !== undefined
+    ? explicitSelection
+    : !loading && tasks.find((t) => t.id === location.state?.openTaskId)
   const liveSelectedTask = selectedTask
     ? tasks.find((t) => t.id === selectedTask.id) || selectedTask
     : null
 
   const handleNewTask = async () => {
-    if (!currentBoard) return
-    const firstGroup = groups[0]
-    if (!firstGroup) {
-      const newGroup = await createGroup(currentBoard.id, 'Tasks')
-      await createTask(currentBoard.id, newGroup.id, profile?.id)
-    } else {
-      await createTask(currentBoard.id, firstGroup.id, profile?.id)
+    if (!currentBoard || !currentUserId || creatingTask) return
+    setCreatingTask(true)
+    try {
+      const firstGroup = groups.filter((group) => !isCompletedTaskGroup(group)).sort((a, b) => a.position - b.position)[0]
+        || await createGroup(currentBoard.id, 'Tasks')
+      const task = await createTask(currentBoard.id, firstGroup.id, currentUserId, null, { assignToCreator: isMyTasks })
+      setNewTaskId(task.id)
+      addToast('Task created')
+    } catch (error) {
+      addToast(error.message || 'Could not create task', 'error')
+    } finally {
+      setCreatingTask(false)
     }
-    addToast('Task created')
   }
 
-  const handleOpenTask = (task) => setSelectedTask(task)
-  const handleClosePanel = () => setSelectedTask(null)
+  const handleOpenTask = (task) => setSelection({ locationKey: location.key, task })
+  const handleClosePanel = () => setSelection({ locationKey: location.key, task: null })
 
   const handleExportCSV = () => {
     if (!currentBoard || !tasks.length) return
@@ -101,6 +109,7 @@ export default function BoardPage() {
         activeView={activeView}
         onViewChange={setActiveView}
         onNewTask={handleNewTask}
+        creatingTask={creatingTask || !currentUserId}
         onExport={handleExportCSV}
         onAutomations={() => setAutomationsOpen(true)}
         filters={filters}
@@ -114,17 +123,19 @@ export default function BoardPage() {
       {(activeView === 'Main Table' || activeView === 'My Tasks') && (
         <div className="flex-1 overflow-hidden flex flex-col">
           {groups.length === 0 ? (
-            <EmptyBoard boardId={boardId} profileId={profile?.id} />
+            <EmptyBoard onCreate={handleNewTask} creating={creatingTask || !currentUserId} />
           ) : (
             <BoardTable
               filters={
                 activeView === 'My Tasks'
-                  ? { assigneeIds: profile?.id ? [profile.id] : [], statuses: [], priorities: [], dueThisWeek: false }
+                  ? { assigneeIds: currentUserId ? [currentUserId] : [], statuses: [], priorities: [], dueThisWeek: false }
                   : filters
               }
               onOpenTask={handleOpenTask}
               groupBy={activeView === 'My Tasks' ? 'group' : groupBy}
-              hideAddTask={activeView === 'My Tasks'}
+              creationAssigneeId={isMyTasks ? currentUserId : null}
+              filterMyProjects={isMyTasks}
+              newTaskId={newTaskId}
             />
           )}
         </div>
@@ -140,6 +151,7 @@ export default function BoardPage() {
 
       {liveSelectedTask && (
         <TaskDetailPanel
+          key={liveSelectedTask.id}
           task={liveSelectedTask}
           onClose={handleClosePanel}
           onUpdate={updateTask}
@@ -190,20 +202,7 @@ function BoardSkeleton() {
 }
 
 // ── Empty board ───────────────────────────────────────────────────────
-function EmptyBoard({ boardId, profileId }) {
-  const { createGroup, createTask } = useBoardStore()
-  const [creating, setCreating] = useState(false)
-
-  const handleCreate = async () => {
-    setCreating(true)
-    try {
-      const group = await createGroup(boardId, 'To Do')
-      await createTask(boardId, group.id, profileId)
-    } finally {
-      setCreating(false)
-    }
-  }
-
+function EmptyBoard({ onCreate, creating }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-white dark:bg-[#1a1a1a]">
       <div className="text-center max-w-xs">
@@ -230,7 +229,7 @@ function EmptyBoard({ boardId, profileId }) {
           Create your first group to start organizing work in this board.
         </p>
         <button
-          onClick={handleCreate}
+          onClick={onCreate}
           disabled={creating}
           className="px-5 py-2.5 bg-primary-blue text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition disabled:opacity-50 shadow-sm"
         >

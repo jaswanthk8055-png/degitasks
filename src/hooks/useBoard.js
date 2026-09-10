@@ -7,11 +7,13 @@ const POLL_INTERVAL_MS = 30_000
 export function useBoard(boardId) {
   const { fetchBoardData, loading, realtimeConnected } = useBoardStore()
   const realtimeRef = useRef(realtimeConnected)
-  realtimeRef.current = realtimeConnected
+  useEffect(() => {
+    realtimeRef.current = realtimeConnected
+  }, [realtimeConnected])
 
   useEffect(() => {
     if (boardId) fetchBoardData(boardId)
-  }, [boardId])
+  }, [boardId, fetchBoardData])
 
   // Re-fetch silently when the user returns to the tab
   useEffect(() => {
@@ -21,7 +23,7 @@ export function useBoard(boardId) {
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [boardId])
+  }, [boardId, fetchBoardData])
 
   // Polling fallback — only fires when realtime is not connected
   useEffect(() => {
@@ -30,7 +32,7 @@ export function useBoard(boardId) {
       if (!realtimeRef.current) fetchBoardData(boardId, true)
     }, POLL_INTERVAL_MS)
     return () => clearInterval(id)
-  }, [boardId])
+  }, [boardId, fetchBoardData])
 
   useRealtime(boardId)
 

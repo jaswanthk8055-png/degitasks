@@ -10,41 +10,45 @@ export default function CommandPalette({ open, onClose }) {
   const navigate = useNavigate()
   const { boards, workspaceId } = useBoardStore()
   const [query, setQuery] = useState('')
-  const [allTasks, setAllTasks] = useState([])
-  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [taskCache, setTaskCache] = useState({ workspaceId: null, tasks: [] })
   const [activeIdx, setActiveIdx] = useState(0)
+  const [wasOpen, setWasOpen] = useState(open)
   const [recent, setRecent] = useState(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
   })
   const inputRef = useRef(null)
-  const fetchedRef = useRef(false)
+  const allTasks = taskCache.workspaceId === workspaceId ? taskCache.tasks : []
+  const loadingTasks = boards.length > 0 && taskCache.workspaceId !== workspaceId
+
+  // Reset the form for each opening while keeping the workspace task cache.
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      setQuery('')
+      setActiveIdx(0)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
-    setQuery('')
-    setActiveIdx(0)
-    setTimeout(() => inputRef.current?.focus(), 30)
+    const timer = setTimeout(() => inputRef.current?.focus(), 30)
+    return () => clearTimeout(timer)
+  }, [open])
 
-    // Fetch all workspace tasks once
-    if (!fetchedRef.current && boards.length > 0) {
-      fetchedRef.current = true
-      setLoadingTasks(true)
-      const boardIds = boards.map((b) => b.id)
-      supabase
-        .from('tasks')
-        .select('id, title, board_id, status, status_color, priority')
-        .in('board_id', boardIds)
-        .then(({ data }) => {
-          setAllTasks(data || [])
-          setLoadingTasks(false)
-        })
-    }
-  }, [open, boards.length])
-
-  // Re-fetch if boards change (new board added)
   useEffect(() => {
-    fetchedRef.current = false
-  }, [workspaceId])
+    if (!open || boards.length === 0 || taskCache.workspaceId === workspaceId) return
+    let cancelled = false
+    // Fetch all workspace tasks once
+    const boardIds = boards.map((b) => b.id)
+    supabase
+      .from('tasks')
+      .select('id, title, board_id, status, status_color, priority')
+      .in('board_id', boardIds)
+      .then(({ data }) => {
+        if (!cancelled) setTaskCache({ workspaceId, tasks: data || [] })
+      })
+    return () => { cancelled = true }
+  }, [open, boards, workspaceId, taskCache.workspaceId])
 
   const trimmedQuery = query.trim().toLowerCase()
   const results = trimmedQuery

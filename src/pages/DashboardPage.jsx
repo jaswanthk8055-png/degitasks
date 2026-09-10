@@ -6,28 +6,31 @@ import { useBoardStore } from '../stores/useBoardStore'
 import { STATUS_OPTIONS, formatDueDate } from '../lib/utils'
 import Avatar from '../components/ui/Avatar'
 
+const EMPTY_TASKS = []
+
 export default function DashboardPage() {
   const { workspace } = useOutletContext() || {}
   const { boards, profiles } = useBoardStore()
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true)
+  const workspaceId = workspace?.id
+  const [taskResult, setTaskResult] = useState(null)
+  const hasBoards = !!workspaceId && boards.length > 0
+  const isCurrentResult = taskResult?.workspaceId === workspaceId && taskResult?.boards === boards
+  const tasks = hasBoards && isCurrentResult ? taskResult.tasks : EMPTY_TASKS
+  const loading = hasBoards && !isCurrentResult
 
   useEffect(() => {
-    if (!workspace?.id || boards.length === 0) return
+    if (!workspaceId || boards.length === 0) return
+    let cancelled = false
     const boardIds = boards.map((b) => b.id)
-    setLoading(true)
     supabase
       .from('tasks')
       .select('*')
       .in('board_id', boardIds)
       .then(({ data }) => {
-        setTasks(data || [])
-        setLoading(false)
+        if (!cancelled) setTaskResult({ workspaceId, boards, tasks: data || [] })
       })
-  }, [workspace?.id, boards.length])
-
-  const now = new Date()
-  const weekEnd = addDays(now, 7)
+    return () => { cancelled = true }
+  }, [workspaceId, boards])
 
   const total = tasks.length
   const doneTasks = useMemo(() => tasks.filter((t) => t.status === 'Done'), [tasks])
@@ -48,15 +51,18 @@ export default function DashboardPage() {
     [tasks]
   )
   const upcoming = useMemo(
-    () =>
-      tasks
+    () => {
+      const now = new Date()
+      const weekEnd = addDays(now, 7)
+      return tasks
         .filter((t) => {
           if (!t.due_date || t.status === 'Done') return false
           try {
             return isWithinInterval(parseISO(t.due_date), { start: now, end: weekEnd })
           } catch { return false }
         })
-        .sort((a, b) => a.due_date.localeCompare(b.due_date)),
+        .sort((a, b) => a.due_date.localeCompare(b.due_date))
+    },
     [tasks]
   )
 
@@ -70,23 +76,20 @@ export default function DashboardPage() {
   )
   const maxStatusCount = Math.max(...byStatus.map((s) => s.count), 1)
 
-  const byMember = useMemo(
-    () =>
-      profiles
-        .map((p) => ({
-          ...p,
-          count: tasks.filter((t) => t.assignee_id === p.id && t.status !== 'Done').length,
-        }))
-        .filter((p) => p.count > 0)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 6),
-    [tasks, profiles]
-  )
+  const byMember = profiles
+    .map((p) => ({
+      ...p,
+      count: tasks.filter((t) => t.assignee_id === p.id && t.status !== 'Done').length,
+    }))
+    .filter((p) => p.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
 
   // Last-7-days done sparkline data
   const sparkData = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, i) => {
+    () => {
+      const now = new Date()
+      return Array.from({ length: 7 }, (_, i) => {
         const d = addDays(now, -6 + i)
         return doneTasks.filter((t) => {
           try {
@@ -94,7 +97,8 @@ export default function DashboardPage() {
             return parseISO(t.updated_at).toDateString() === d.toDateString()
           } catch { return false }
         }).length
-      }),
+      })
+    },
     [doneTasks]
   )
 

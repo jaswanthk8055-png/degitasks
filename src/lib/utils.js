@@ -31,7 +31,9 @@ export function loadStatusOptions(boardId) {
 export function saveStatusOptionsToStorage(boardId, options) {
   try {
     localStorage.setItem(`status-options-${boardId}`, JSON.stringify(options))
-  } catch {}
+  } catch {
+    // The board still works when browser storage is unavailable.
+  }
 }
 
 export const PRIORITY_OPTIONS = [

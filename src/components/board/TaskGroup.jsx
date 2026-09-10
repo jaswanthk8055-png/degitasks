@@ -124,12 +124,13 @@ export default function TaskGroup({
   onWidthChange,
   isVirtual = false,
   hideAddTask = false,
+  focusTaskId = null,
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
   const { user } = useAuthStore()
   const canEdit = !isVirtual && user?.email === SUPER_USER_EMAIL
   const storageKey = `group-collapsed-${group.id}`
-  const [collapsed,           setCollapsed]           = useState(() => localStorage.getItem(storageKey) === 'true')
+  const [collapsed,           setCollapsed]           = useState(() => !tasks.some((task) => task.id === focusTaskId) && localStorage.getItem(storageKey) === 'true')
   const [editingName,         setEditingName]         = useState(false)
   const [nameValue,           setNameValue]           = useState(group.name)
   const [newTaskId,           setNewTaskId]           = useState(null)
@@ -150,6 +151,22 @@ export default function TaskGroup({
   const [editingSGName,       setEditingSGName]       = useState('')
   const contextMenuRef    = useRef(null)
   const colorPickerRef    = useRef(null)
+  const [lastFocusTaskId, setLastFocusTaskId] = useState(focusTaskId)
+
+  // Header creation happens outside this component. Reveal its row before paint,
+  // including when this group or the target project was previously collapsed.
+  if (focusTaskId !== lastFocusTaskId) {
+    setLastFocusTaskId(focusTaskId)
+    const task = tasks.find((item) => item.id === focusTaskId)
+    if (task) {
+      setCollapsed(false)
+      if (task.sub_group_id) setCollapsedSGs((previous) => ({ ...previous, [task.sub_group_id]: false }))
+    }
+  }
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, String(collapsed))
+  }, [collapsed, storageKey])
 
   const visibleColumns = boardColumns.filter((c) => !c.hidden)
 
@@ -186,6 +203,7 @@ export default function TaskGroup({
   }
 
   const handleAddTask = async (subGroupId = null) => {
+    if (hideAddTask || !onAddTask) return
     const task = await onAddTask(group.id, subGroupId)
     if (task) {
       setNewTaskId(task.id)
@@ -198,7 +216,7 @@ export default function TaskGroup({
 
   const handleAddSubGroup = async (e) => {
     e.preventDefault()
-    if (!newSGName.trim() || !onAddSubGroup) return
+    if (hideAddTask || !newSGName.trim() || !onAddSubGroup) return
     await onAddSubGroup(newSGName.trim())
     setNewSGName('')
     setAddingSubGroup(false)
@@ -351,7 +369,7 @@ export default function TaskGroup({
                 onUpdate={onUpdateTask}
                 onDelete={onDeleteTask}
                 onOpenDetail={onOpenTask}
-                autoFocus={task.id === newTaskId}
+                autoFocus={task.id === newTaskId || task.id === focusTaskId}
                 extraColumns={visibleColumns}
                 colWidths={colWidths}
               />
@@ -394,7 +412,7 @@ export default function TaskGroup({
                           onUpdate={onUpdateTask}
                           onDelete={onDeleteTask}
                           onOpenDetail={onOpenTask}
-                          autoFocus={task.id === newTaskId}
+                          autoFocus={task.id === newTaskId || task.id === focusTaskId}
                           extraColumns={visibleColumns}
                           colWidths={colWidths}
                         />
@@ -421,7 +439,7 @@ export default function TaskGroup({
           </SortableContext>
 
           {/* Add sub-group input */}
-          {!isVirtual && addingSubGroup ? (
+          {!isVirtual && !hideAddTask && addingSubGroup ? (
             <form
               onSubmit={handleAddSubGroup}
               className="flex items-center gap-2 pl-6 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a]"

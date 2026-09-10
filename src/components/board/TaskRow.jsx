@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
-import { COL_DEFAULTS } from './BoardTable'
+import { COL_DEFAULTS } from './columnWidths'
 import StatusPill from './StatusPill'
 import PriorityPill from './PriorityPill'
 import AssigneePicker from './AssigneePicker'
@@ -25,8 +25,18 @@ export default function TaskRow({
   const { user } = useAuthStore()
   const canEdit = user?.email === SUPER_USER_EMAIL
 
-  const [editingTitle, setEditingTitle] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(autoFocus)
   const [titleValue, setTitleValue] = useState(task.title || '')
+  const [previousAutoFocus, setPreviousAutoFocus] = useState(autoFocus)
+
+  // A newly created row may receive its autofocus flag after it first mounts.
+  if (autoFocus !== previousAutoFocus) {
+    setPreviousAutoFocus(autoFocus)
+    if (autoFocus) {
+      setTitleValue(task.title || '')
+      setEditingTitle(true)
+    }
+  }
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id })
@@ -38,17 +48,8 @@ export default function TaskRow({
   }
 
   useEffect(() => {
-    if (autoFocus) { setEditingTitle(true) }
-  }, [autoFocus])
-
-  useEffect(() => {
     if (editingTitle && titleInputRef.current) titleInputRef.current.focus()
   }, [editingTitle])
-
-  // Keep local title in sync if task updates from realtime
-  useEffect(() => {
-    if (!editingTitle) setTitleValue(task.title || '')
-  }, [task.title, editingTitle])
 
   const commitTitle = () => {
     setEditingTitle(false)
@@ -115,7 +116,7 @@ export default function TaskRow({
         ) : (
           <span
             className="flex-1 min-w-0 text-sm text-gray-900 dark:text-gray-100 hover:text-primary-blue transition truncate cursor-text"
-            onClick={() => setEditingTitle(true)}
+            onClick={() => { setTitleValue(task.title || ''); setEditingTitle(true) }}
           >
             {task.title || <span className="text-gray-400 dark:text-gray-600 italic text-xs">Click to name</span>}
           </span>
@@ -161,9 +162,7 @@ export default function TaskRow({
             key={col.id}
             column={col}
             value={colValues[col.id]}
-            taskId={task.id}
             width={width}
-            canEdit={canEdit}
             onUpdate={(val) => updateColumnValue(task.id, col.id, val)}
           />
         )
@@ -187,7 +186,7 @@ export default function TaskRow({
 }
 
 // ── Custom column cell ────────────────────────────────────────────────────────
-function CustomColumnCell({ column, value, taskId, width, onUpdate, canEdit = true }) {
+function CustomColumnCell({ column, value, width, onUpdate }) {
   const [editing,  setEditing]  = useState(false)
   const [localVal, setLocalVal] = useState('')
 

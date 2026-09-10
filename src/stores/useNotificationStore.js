@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 
-export const useNotificationStore = create((set, get) => ({
+export const useNotificationStore = create((set) => ({
   notifications: [],
   unreadCount: 0,
 

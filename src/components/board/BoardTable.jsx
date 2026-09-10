@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import Modal from '../ui/Modal'
 import {
   DndContext,
@@ -29,16 +29,10 @@ import { useToastStore } from '../../stores/useToastStore'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, avatarColorFromName, applyTaskFilters } from '../../lib/utils'
 import TaskGroup from './TaskGroup'
 import TaskRow from './TaskRow'
+import { COL_DEFAULTS } from './columnWidths'
+import { isCompletedTaskGroup } from '../../lib/taskGroups'
 
 
-// Default pixel widths for fixed columns
-export const COL_DEFAULTS = {
-  title:    320,
-  status:   140,
-  assignee: 112,
-  dueDate:  112,
-  priority: 112,
-}
 const MIN_WIDTH = 60
 const MAX_WIDTH = 600
 
@@ -90,7 +84,7 @@ function buildVirtualGroups(groupBy, tasks, profiles) {
   return null
 }
 
-export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false }) {
+export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false, creationAssigneeId = null, filterMyProjects = false, newTaskId = null }) {
   const {
     groups, tasks, subGroups, profiles, boardColumns, automations,
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
@@ -104,6 +98,10 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
   const [activeTask, setActiveTask]   = useState(null)
   const [addingGroup, setAddingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
+  // Keep only this user's newly created empty project visible while they add
+  // its first task. Existing projects must have a matching task in My Tasks.
+  const [draftProjects, setDraftProjects] = useState([])
+  const currentUserId = user?.id || profile?.id
 
   // ── Column widths ──────────────────────────────────────────────────
   const boardId = currentBoard?.id
@@ -113,7 +111,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     const w = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth))
     setColWidths((prev) => {
       const next = { ...prev, [colKey]: w }
-      try { localStorage.setItem(`col-widths-${boardId}`, JSON.stringify(next)) } catch {}
+      try { localStorage.setItem(`col-widths-${boardId}`, JSON.stringify(next)) } catch { /* Keep in-memory widths when storage is unavailable. */ }
       return next
     })
   }, [boardId])
@@ -298,10 +296,27 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
   }
 
   const handleAddTask = async (groupId, subGroupId = null) => {
-    if (!currentBoard) return null
-    const task = await createTask(currentBoard.id, groupId, profile?.id, subGroupId)
-    if (task) addToast('Task created')
-    return task
+    if (!currentBoard || isCompletedTaskGroup(groups.find((group) => group.id === groupId))) return null
+    try {
+      const task = await createTask(currentBoard.id, groupId, currentUserId, subGroupId, { assignToCreator: !!creationAssigneeId })
+      if (task) {
+        setDraftProjects((projects) => projects.filter((project) => project.id !== subGroupId))
+        addToast('Task created')
+      }
+      return task
+    } catch (error) {
+      addToast(error.message || 'Could not create task', 'error')
+      return null
+    }
+  }
+
+  const handleAddProject = async (groupId, name) => {
+    if (!currentBoard || isCompletedTaskGroup(groups.find((group) => group.id === groupId))) return null
+    const project = await createSubGroup(currentBoard.id, groupId, name)
+    if (filterMyProjects && project) {
+      setDraftProjects((projects) => [...projects, { id: project.id, userId: currentUserId }])
+    }
+    return project
   }
 
   const [taskToDelete, setTaskToDelete] = useState(null)
@@ -364,9 +379,13 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         .filter((t) => t.group_id === group.id)
         .filter(filterTask)
         .sort((a, b) => a.position - b.position)
-      if (hideAddTask && groupTasks.length === 0) return null
+      const completedGroup = isCompletedTaskGroup(group)
+      if ((hideAddTask || (filterMyProjects && completedGroup)) && groupTasks.length === 0) return null
       const groupSubGroups = subGroups
         .filter((sg) => sg.group_id === group.id)
+        .filter((sg) => !filterMyProjects || groupTasks.some((task) => task.sub_group_id === sg.id)
+          || (!completedGroup && draftProjects.some((project) => project.id === sg.id && project.userId === currentUserId)
+            && !tasks.some((task) => task.sub_group_id === sg.id)))
         .sort((a, b) => a.position - b.position)
       return (
         <TaskGroup
@@ -380,13 +399,14 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
           onDeleteTask={handleDeleteTask}
           onUpdateGroupName={updateGroupName}
           onDeleteGroup={handleDeleteGroup}
-          onAddSubGroup={(name) => createSubGroup(currentBoard.id, group.id, name)}
+          onAddSubGroup={(name) => handleAddProject(group.id, name)}
           onUpdateSubGroup={updateSubGroup}
           onDeleteSubGroup={deleteSubGroup}
           onOpenTask={onOpenTask}
           colWidths={colWidths}
           onWidthChange={handleWidthChange}
-          hideAddTask={hideAddTask}
+          hideAddTask={hideAddTask || completedGroup}
+          focusTaskId={newTaskId}
         />
       )
     })

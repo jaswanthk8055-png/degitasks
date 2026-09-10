@@ -10,7 +10,7 @@ export default function DatePicker({ dueDate, taskId, onUpdate }) {
     if (!editing || !inputRef.current) return
     inputRef.current.focus()
     // showPicker() works in standard Chrome; silently ignored in Teams WebView
-    try { inputRef.current.showPicker?.() } catch {}
+    try { inputRef.current.showPicker?.() } catch { /* The focused date input remains usable without a native picker. */ }
   }, [editing])
 
   const handleChange = (e) => {

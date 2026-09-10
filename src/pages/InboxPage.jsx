@@ -11,37 +11,34 @@ const ACTION_LABELS = {
   comment_added: (meta) => `commented on "${meta.task_title || 'a task'}"`,
 }
 
+const EMPTY_ACTIVITIES = []
+
 export default function InboxPage() {
   const { workspace } = useOutletContext()
-  const [activities, setActivities] = useState([])
+  const workspaceId = workspace?.id
+  const [activityResult, setActivityResult] = useState(null)
   const [profiles, setProfiles] = useState([])
-  const [loading, setLoading] = useState(true)
+  const isCurrentResult = !!workspaceId && activityResult?.workspaceId === workspaceId
+  const activities = isCurrentResult ? activityResult.activities : EMPTY_ACTIVITIES
+  const loading = !!workspaceId && !isCurrentResult
 
   useEffect(() => {
-    if (!workspace?.id) {
-      setLoading(false)
-      return
-    }
-    fetchActivities()
-    fetchProfiles()
-  }, [workspace?.id])
-
-  const fetchProfiles = async () => {
-    const { data } = await supabase.from('profiles').select('*')
-    if (data) setProfiles(data)
-  }
-
-  const fetchActivities = async () => {
-    setLoading(true)
-    const { data } = await supabase
+    if (!workspaceId) return
+    let cancelled = false
+    supabase.from('profiles').select('*').then(({ data }) => {
+      if (!cancelled && data) setProfiles(data)
+    })
+    supabase
       .from('activity_log')
       .select('*')
-      .eq('workspace_id', workspace.id)
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
       .limit(100)
-    setActivities(data || [])
-    setLoading(false)
-  }
+      .then(({ data }) => {
+        if (!cancelled) setActivityResult({ workspaceId, activities: data || [] })
+      })
+    return () => { cancelled = true }
+  }, [workspaceId])
 
   const grouped = groupByDate(activities)
 

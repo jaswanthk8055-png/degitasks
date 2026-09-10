@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { assigneeId, taskTitle, assignerName, boardName, boardId, taskId } = req.body
+  const { assigneeId, taskTitle, assignerName, boardName, boardId } = req.body
 
   if (!assigneeId || !taskTitle) {
     return res.status(400).json({ error: 'Missing required fields' })

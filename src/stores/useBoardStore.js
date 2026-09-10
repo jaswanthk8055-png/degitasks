@@ -6,7 +6,7 @@ function loadAutomationsCache(boardId) {
   try { return JSON.parse(localStorage.getItem(`board-automations-${boardId}`) || '[]') } catch { return [] }
 }
 function saveAutomationsCache(boardId, list) {
-  try { localStorage.setItem(`board-automations-${boardId}`, JSON.stringify(list)) } catch {}
+  try { localStorage.setItem(`board-automations-${boardId}`, JSON.stringify(list)) } catch { /* Database state remains available if the local cache cannot be saved. */ }
 }
 
 export const useBoardStore = create((set, get) => ({
@@ -240,7 +240,8 @@ export const useBoardStore = create((set, get) => ({
   },
 
   // ─── Tasks ────────────────────────────────────────────────────────
-  createTask: async (boardId, groupId, userId, subGroupId = null) => {
+  createTask: async (boardId, groupId, userId, subGroupId = null, { assignToCreator = false } = {}) => {
+    if (assignToCreator && !userId) throw new Error('Sign in before creating a task in My Tasks.')
     const groupTasks = get().tasks.filter((t) => t.group_id === groupId)
     const position = groupTasks.length
 
@@ -255,18 +256,20 @@ export const useBoardStore = create((set, get) => ({
         status_color: '#c4c4c4',
         position,
         created_by: userId,
+        ...(assignToCreator ? { assignee_id: userId, assignee_ids: [userId] } : {}),
       })
       .select()
       .single()
     if (error) throw error
 
-    set((s) => ({ tasks: [...s.tasks, data] }))
+    // Realtime may deliver this INSERT before the request completes.
+    set((s) => ({ tasks: s.tasks.some((task) => task.id === data.id) ? s.tasks : [...s.tasks, data] }))
 
     get().logActivity({
       taskId: data.id,
       userId,
       action: 'task_created',
-      meta: { task_title: '' },
+      meta: { task_title: '', ...(assignToCreator ? { auto_assigned_user_id: userId } : {}) },
     })
 
     return data

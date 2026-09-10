@@ -2,65 +2,80 @@
 
 A collaborative task management web app inspired by Monday.com's UI/UX.
 
-Built with React 18 + Vite, Tailwind CSS v3, Supabase, Zustand, and @dnd-kit.
+Built with React 19 + Vite 8, Tailwind CSS v3, Supabase, Zustand, and @dnd-kit.
 
 ---
 
 ## Prerequisites
 
-- Node.js 18+
-- A [Supabase](https://supabase.com) account (free tier is sufficient)
+- Node.js 24 is recommended (`.nvmrc` records this version); Node.js 22.13+ is also supported.
+- Access to the existing Supabase project and its frontend configuration.
 
 ---
 
-## Setup
+## Continue development on a new PC
+
+The frontend connects to the existing hosted Supabase project. Moving the source code to another PC does not require creating a database, rerunning SQL, redeploying functions, or registering another Teams app.
 
 ### 1. Install dependencies
 
-```bash
-cd degitasks
-npm install
+Run these commands inside the `taskflow` folder, which contains `package.json`:
+
+```powershell
+npm ci
 ```
 
-### 2. Create a Supabase project
+Use `npm ci` to reinstall the exact versions in `package-lock.json`. Do not reuse a copied `node_modules` folder: copying/syncing it can omit nested dependency files (including files inside the Teams SDK). Do not delete or regenerate the lockfile to repair this.
 
-1. Go to [supabase.com](https://supabase.com) and create a new project.
-2. Wait for the project to be provisioned (~1 minute).
+On Windows, if PowerShell blocks `npm.ps1`, use `npm.cmd` for the same commands.
 
-### 3. Run the database schema
+### 2. Keep the existing environment configuration
 
-1. In your Supabase dashboard, navigate to **SQL Editor**.
-2. Open `supabase/schema.sql` from this project.
-3. Paste the entire contents into the SQL editor and click **Run**.
+If `.env` was copied with the project, keep it. It contains the existing project's `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Otherwise, create `.env` from `.env.example` and obtain the existing project values from its owner or Supabase dashboard.
 
-This creates all tables, Row Level Security policies, triggers (auto-create profile on signup, auto-update `updated_at`), and enables Realtime for `tasks`, `groups`, and `boards`.
+Never place a Supabase service-role key or email API secret in a `VITE_` variable: these values are included in the browser bundle.
 
-### 4. Configure environment variables
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in your Supabase credentials:
-
-```
-VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-Find these in your Supabase dashboard under **Settings → API**.
-
-### 5. Start the dev server
+### 3. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+Open the URL printed by Vite (normally `http://localhost:5173`) and sign in with your existing account. Changes made after signing in use the configured Supabase database, including the team's real data when production credentials are configured.
+
+`npm run dev` serves the frontend only. Invitations still use the deployed Supabase function, but assignment emails use Vercel's `/api/send-email` endpoint, which Vite does not run. To test that endpoint locally, use `npx vercel dev` with the existing Vercel project and server-side environment variables; do not add server secrets to the frontend. `npm run preview` also serves only the frontend.
+
+For password-reset links in local development, the exact local `/reset-password` URL must be allowed in the existing project's Supabase Auth redirect settings. Normal email/password sign-in does not require a localhost redirect change.
+
+### 4. Check changes before release
+
+```powershell
+npm run check
+```
+
+This runs ESLint, the regression tests, and creates the production frontend in `dist/`. Tests use isolated mock transport and an in-memory PostgreSQL database; they do not access the team's Supabase project. The command does not deploy or modify the live database. Verify affected authenticated flows and email delivery before deploying.
+
+Run `npm test` for regression checks only. The dropdown visual fixture is available at `/tests/dropdown-demo.html` while the Vite dev server is running; it contains no team data and is not included in the production build.
+
+## My Tasks creation and empty-task cleanup
+
+Tasks created using **New Task**, **Add task**, or **Add task to this project** in My Tasks are assigned to the current user in the initial insert. Their row appears immediately and is ready to name. My Tasks shows projects containing tasks assigned to you. A new empty project you create stays visible in the current session while you add its first task. **Add Project** remains available in active groups, including groups with no tasks assigned to you. Main Table creation continues to leave the assignee blank.
+
+Groups named **Completed Tasks** or **Completed** have no task/project creation controls in either view. The header's **New Task** uses the first active group, creating a **Tasks** group if none exists.
+
+Status, priority and assignee dropdowns open above their trigger when space below is insufficient. Long lists scroll inside the menu so all choices remain reachable.
+
+The nightly cleanup requires one separate Supabase migration: `supabase/cleanup-empty-tasks.sql`. It installs a daily midnight India-time job, with a 24-hour untouched grace period, and keeps tasks containing entered information. Projects/groups, tasks with children, and child tasks with a parent are retained. Assignment alone does not protect an empty task: manual, automatic, multiple-assignee and unassigned tasks follow the same checks. Assignment changes restart the 24-hour grace period; other recorded activity still protects the task. See [the cleanup installation and dry-run guide](supabase/cleanup-empty-tasks.md) for full rules and rollout steps. The frontend build/deployment alone does not activate this database job. Apply only this new migration to the existing database; do not replay historical schema scripts.
+
+## Setting up a separate database
+
+The SQL files under `supabase/` are historical scripts, not a complete ordered migration set. They do not define all objects used by the current app (including `sub_groups`, `boards.status_options`, and `boards.automations`). Obtain a complete schema export and configuration from the existing project before creating a separate development database. Do not replay these scripts into the working production database as part of PC setup.
 
 ---
 
-## First run
+## First run with a new account
+
+Existing team members should sign in instead. Signup creates records in the configured database.
 
 1. Navigate to `/signup` and create an account.
 2. DegiTasks automatically creates a default workspace, a **"My First Board"** board with two groups ("To Do" and "In Progress") and three placeholder tasks.
@@ -68,7 +83,7 @@ The app will be available at `http://localhost:5173`.
 
 ---
 
-## Features (Phase 1)
+## Features
 
 | Feature | Status |
 |---|---|
@@ -88,8 +103,8 @@ The app will be available at `http://localhost:5173`.
 | Create/rename boards | ✅ |
 | Create/rename groups | ✅ |
 | Add/delete tasks | ✅ |
-| Kanban view | 🔜 Phase 2 |
-| Calendar view | 🔜 Phase 2 |
+| Kanban / summary view | ✅ |
+| Calendar view | ✅ |
 
 ---
 
@@ -108,17 +123,48 @@ src/
 ├── pages/           LoginPage, SignupPage, BoardPage, HomePage, NotFoundPage
 └── stores/          useAuthStore, useBoardStore
 supabase/
-└── schema.sql       Full database schema with RLS
+└── *.sql            Historical schema and incremental changes (see database setup note)
 ```
 
 ---
 
 ## Tech stack
 
-- **React 18** + **Vite** — frontend framework & build tool
+- **React 19** + **Vite 8** — frontend framework & build tool
 - **Tailwind CSS v3** — utility-first styling
 - **Supabase** — auth, PostgreSQL database, realtime subscriptions
-- **React Router v6** — client-side routing
+- **React Router v7** — client-side routing
 - **Zustand** — lightweight client state management
 - **@dnd-kit** — accessible drag-and-drop
 - **date-fns** — date formatting utilities
+
+---
+
+## Architecture & external services
+
+DegiTasks is a static frontend (Vercel) backed by Supabase, with a few integrations layered on top:
+
+| Service | Role | Where it's configured |
+|---|---|---|
+| **Supabase** | Auth, Postgres DB, Row Level Security, Realtime subscriptions, and 3 Edge Functions | Project dashboard → Settings → API. Schema lives in `supabase/schema.sql` (plus incremental migrations: `phase2.sql`, `phase3.sql`, `phase4.sql`, `multi-assignee.sql`, `add_*.sql`, `fix_rls_recursion.sql`) |
+| **Vercel** | Hosting/deployment, serverless function (`api/send-email.js`), Teams-specific CSP headers | `vercel.json`; env vars set in the Vercel project dashboard |
+| **Resend** | Transactional email (workspace invites, daily task reminders) | `RESEND_API_KEY` env var, used by `api/send-email.js` and the `send-invite-email` / `send-daily-reminders` Edge Functions |
+| **Microsoft Teams / Azure AD** | Teams tab app, auth popup, and daily reminder webhook | `teams-app/manifest.json` (Teams app registration), `TEAMS_WEBHOOK_URL` used by the `teams-reminder` Edge Function |
+| **Domain** | Production URL | `degitasks.degitrans.com` / `degitasks.com` |
+
+### Supabase Edge Functions (`supabase/functions/`)
+- `send-invite-email` — sends workspace invite emails via Resend when a member is invited.
+- `send-daily-reminders` — cron-triggered (see `supabase/daily-reminders-cron.sql`), emails users their due/overdue tasks daily at 8:30 AM IST.
+- `teams-reminder` — posts daily reminders into Microsoft Teams via `TEAMS_WEBHOOK_URL` for users who've opted in.
+
+### Environment variables & secrets
+- **Frontend (`.env`)**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — safe to expose client-side, see `.env.example`.
+- **Vercel project env vars**: `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` — required by `api/send-email.js`.
+- **Supabase Edge Function secrets** (set via `supabase secrets set` or the dashboard, not in this repo): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `FROM_EMAIL`, `APP_URL`, `TEAMS_WEBHOOK_URL`.
+- None of the service-role/API-key secrets are committed to the repo — they must be pulled from the Vercel and Supabase dashboards directly by anyone with project access.
+
+### Deployment
+- The documented production workflow is push to `main` → Vercel auto-deploys. Confirm the Git connection and production branch in the existing Vercel project before your first release from this PC. Run `npm run check` before pushing.
+- Database changes: apply only the new, reviewed SQL for that feature, in dependency order. No migration runner is configured; do not rerun historical files or rely on alphabetical filename order.
+- Edge Function changes: deploy via `supabase functions deploy <name>` (requires Supabase CLI + project link).
+- Teams app: packaged via `package-teams.bat` into `degitask-teams.zip`, then uploaded/updated in the Teams admin center or sideloaded for testing.

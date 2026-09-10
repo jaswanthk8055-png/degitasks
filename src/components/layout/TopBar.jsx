@@ -18,6 +18,7 @@ export default function TopBar({
   activeView,
   onViewChange,
   onNewTask,
+  creatingTask = false,
   onExport,
   onAutomations,
   filters,
@@ -252,7 +253,8 @@ export default function TopBar({
           {/* New Task */}
           <button
             onClick={onNewTask}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary-blue text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition shadow-sm"
+            disabled={creatingTask}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary-blue text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition shadow-sm disabled:opacity-50 disabled:cursor-wait"
           >
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />

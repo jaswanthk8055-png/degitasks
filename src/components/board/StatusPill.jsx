@@ -68,7 +68,6 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
       {managing && (
         <ManageStatusModal
           options={options}
-          boardId={currentBoard?.id}
           onSave={(newOptions) => {
             updateStatusOptions(currentBoard.id, newOptions)
             setManaging(false)
@@ -80,8 +79,8 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
   )
 }
 
-function ManageStatusModal({ options, boardId, onSave, onClose }) {
-  const [draft, setDraft] = useState(options.map((o) => ({ ...o, _id: Math.random() })))
+function ManageStatusModal({ options, onSave, onClose }) {
+  const [draft, setDraft] = useState(() => options.map((o) => ({ ...o, _id: Math.random() })))
   const [newLabel, setNewLabel] = useState('')
   const [newColor, setNewColor] = useState(STATUS_COLORS[0])
 

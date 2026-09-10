@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useBoardStore } from '../../stores/useBoardStore'
@@ -8,12 +8,13 @@ import ToastContainer from '../ui/Toast'
 import CommandPalette from '../ui/CommandPalette'
 
 export default function AppLayout() {
-  const { user, profile, loading } = useAuthStore()
+  const { user, loading } = useAuthStore()
   const { fetchBoards, createBoard } = useBoardStore()
   const navigate = useNavigate()
   const [workspace, setWorkspace] = useState(null)
   const [workspaceMembers, setWorkspaceMembers] = useState([])
-  const [workspaceLoading, setWorkspaceLoading] = useState(true)
+  const [loadedUserId, setLoadedUserId] = useState(null)
+  const workspaceLoading = loadedUserId !== user?.id
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const isTeamsMode = new URLSearchParams(window.location.search).get('teams') === 'true'
@@ -34,54 +35,7 @@ export default function AppLayout() {
     if (!loading && !user) navigate('/login')
   }, [user, loading, navigate])
 
-  useEffect(() => {
-    if (!user) return
-    fetchWorkspace()
-  }, [user])
-
-  const activateWorkspace = (ws) => {
-    setWorkspace(ws)
-    fetchBoards(ws.id)
-    fetchWorkspaceMembers(ws.id)
-  }
-
-  const fetchWorkspace = async () => {
-    setWorkspaceLoading(true)
-    try {
-      const { data, error: fetchErr } = await supabase
-        .from('workspaces')
-        .select('*')
-        .order('created_at')
-        .limit(1)
-        .maybeSingle()
-
-      if (fetchErr) console.error('[workspace] fetch error:', fetchErr)
-
-      if (data) {
-        activateWorkspace(data)
-        return
-      }
-
-      const displayName = profile?.full_name || user.email?.split('@')[0] || 'My'
-      const { data: newWs, error: createErr } = await supabase
-        .from('workspaces')
-        .insert({ name: `${displayName}'s Workspace`, owner_id: user.id })
-        .select()
-        .single()
-
-      if (createErr) { console.error('[workspace] create error:', createErr); return }
-
-      await supabase
-        .from('workspace_members')
-        .insert({ workspace_id: newWs.id, user_id: user.id, role: 'owner' })
-      await createBoard(newWs.id, user.id, 'My First Board')
-      activateWorkspace(newWs)
-    } finally {
-      setWorkspaceLoading(false)
-    }
-  }
-
-  const fetchWorkspaceMembers = async (workspaceId) => {
+  const fetchWorkspaceMembers = useCallback(async (workspaceId) => {
     const { data } = await supabase
       .from('workspace_members')
       .select('user_id, profiles(*)')
@@ -89,7 +43,56 @@ export default function AppLayout() {
     if (data) {
       setWorkspaceMembers(data.map((m) => m.profiles).filter(Boolean))
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    const activateWorkspace = (ws) => {
+      if (cancelled) return
+      setWorkspace(ws)
+      fetchBoards(ws.id)
+      fetchWorkspaceMembers(ws.id)
+    }
+
+    const fetchWorkspace = async () => {
+      try {
+        const { data, error: fetchErr } = await supabase
+          .from('workspaces')
+          .select('*')
+          .order('created_at')
+          .limit(1)
+          .maybeSingle()
+
+        if (cancelled) return
+        if (fetchErr) console.error('[workspace] fetch error:', fetchErr)
+
+        if (data) {
+          activateWorkspace(data)
+          return
+        }
+
+        const displayName = useAuthStore.getState().profile?.full_name || user.email?.split('@')[0] || 'My'
+        const { data: newWs, error: createErr } = await supabase
+          .from('workspaces')
+          .insert({ name: `${displayName}'s Workspace`, owner_id: user.id })
+          .select()
+          .single()
+
+        if (createErr) { console.error('[workspace] create error:', createErr); return }
+
+        await supabase
+          .from('workspace_members')
+          .insert({ workspace_id: newWs.id, user_id: user.id, role: 'owner' })
+        await createBoard(newWs.id, user.id, 'My First Board')
+        activateWorkspace(newWs)
+      } finally {
+        if (!cancelled) setLoadedUserId(user.id)
+      }
+    }
+    fetchWorkspace()
+    return () => { cancelled = true }
+  }, [user, fetchBoards, createBoard, fetchWorkspaceMembers])
 
   if (loading) {
     return (

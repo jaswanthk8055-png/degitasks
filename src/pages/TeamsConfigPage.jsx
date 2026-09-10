@@ -1,5 +1,5 @@
 import * as microsoftTeams from '@microsoft/teams-js';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function TeamsConfigPage() {
@@ -9,6 +9,20 @@ export default function TeamsConfigPage() {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
   const selectedBoardRef = useRef('');
+
+  const checkSessionAndFetchBoards = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsLoggedIn(true);
+        const { data } = await supabase.from('boards').select('id, name').order('created_at');
+        setBoards(data || []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     microsoftTeams.app.initialize().then(async () => {
@@ -25,21 +39,7 @@ export default function TeamsConfigPage() {
 
       await checkSessionAndFetchBoards();
     });
-  }, []);
-
-  const checkSessionAndFetchBoards = async () => {
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsLoggedIn(true);
-        const { data } = await supabase.from('boards').select('id, name').order('created_at');
-        setBoards(data || []);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [checkSessionAndFetchBoards]);
 
   const handleSignIn = async () => {
     setAuthError('');

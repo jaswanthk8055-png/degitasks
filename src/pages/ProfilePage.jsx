@@ -22,7 +22,6 @@ export default function ProfilePage() {
   const [saveMsg, setSaveMsg] = useState(null)
 
   const [changingPassword, setChangingPassword] = useState(false)
-  const [currentPasswordNote, setCurrentPasswordNote] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [pwSaving, setPwSaving] = useState(false)

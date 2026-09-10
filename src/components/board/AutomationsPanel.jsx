@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useBoardStore } from '../../stores/useBoardStore'
 import Modal from '../ui/Modal'
 
@@ -7,16 +7,10 @@ export default function AutomationsPanel({ open, onClose }) {
   const boardId = currentBoard?.id
 
   const [creating,   setCreating]   = useState(false)
-  const [newTrigger, setNewTrigger] = useState('')
-  const [newGroupId, setNewGroupId] = useState('')
-
-  useEffect(() => {
-    if (statusOptions.length > 0 && !newTrigger) setNewTrigger(statusOptions[0]?.label || '')
-  }, [statusOptions])
-
-  useEffect(() => {
-    if (groups.length > 0 && !newGroupId) setNewGroupId(groups[0].id)
-  }, [groups])
+  const [selectedTrigger, setNewTrigger] = useState('')
+  const [selectedGroupId, setNewGroupId] = useState('')
+  const newTrigger = selectedTrigger || statusOptions[0]?.label || ''
+  const newGroupId = selectedGroupId || groups[0]?.id || ''
 
   const persist = (list) => updateAutomations(boardId, list)
 

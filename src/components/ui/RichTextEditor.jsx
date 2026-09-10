@@ -32,7 +32,7 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly 
           underline:     document.queryCommandState('underline'),
           strikeThrough: document.queryCommandState('strikeThrough'),
         })
-      } catch (_) {}
+      } catch { /* Some embedded browsers do not support queryCommandState. */ }
     }
     document.addEventListener('selectionchange', update)
     return () => document.removeEventListener('selectionchange', update)

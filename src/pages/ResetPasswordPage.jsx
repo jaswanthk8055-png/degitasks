@@ -34,9 +34,6 @@ export default function ResetPasswordPage() {
     }
   }, [])
 
-  // Cancel the invalid state once ready
-  useEffect(() => { if (ready) setInvalid(false) }, [ready])
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')

@@ -3,10 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "^22.13.0 || >=24.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "check": "npm run lint && npm test && npm run build",
+    "test": "npm run test:unit && npm run test:ui && npm run test:cleanup",
+    "test:unit": "node --test tests/*.test.js",
+    "test:ui": "vitest run",
+    "test:cleanup": "node supabase/tests/cleanup-empty-tasks.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -23,7 +31,9 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -32,8 +42,10 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^5.0.0"
   }
 }

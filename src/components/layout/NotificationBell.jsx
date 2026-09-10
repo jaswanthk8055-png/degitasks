@@ -28,7 +28,7 @@ export default function NotificationBell() {
       .subscribe()
 
     return () => supabase.removeChannel(channel)
-  }, [profile?.id])
+  }, [profile?.id, fetchNotifications, addNotification])
 
   // Click outside to close
   useEffect(() => {

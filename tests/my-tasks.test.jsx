@@ -59,7 +59,13 @@ function installDatabaseDouble() {
         operation?.filters.push({ column, value })
         return query
       },
-      single() { return Promise.resolve({ data: row, error: null }) },
+      single() {
+        if (operation?.action === 'update' && table === 'tasks') {
+          const taskId = operation.filters.find((filter) => filter.column === 'id')?.value
+          row = { ...useBoardStore.getState().tasks.find((task) => task.id === taskId), ...operation.payload }
+        }
+        return Promise.resolve({ data: row, error: null })
+      },
       then(resolve, reject) { return Promise.resolve({ data: row, error: null }).then(resolve, reject) },
     }
     return query

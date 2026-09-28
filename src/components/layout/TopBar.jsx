@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { STATUS_OPTIONS, PRIORITY_OPTIONS } from '../../lib/utils'
@@ -28,13 +28,24 @@ export default function TopBar({
   groupBy = 'group',
   onGroupByChange,
 }) {
-  const { currentBoard, realtimeConnected, updateBoardName, profiles } = useBoardStore()
+  const { currentBoard, realtimeConnected, updateBoardName, profiles, statusOptions, tasks } = useBoardStore()
   const { user } = useAuthStore()
   const canEdit = user?.email === SUPER_USER_EMAIL
+  const isMyTasks = activeView === 'My Tasks'
   const [editingName,  setEditingName]  = useState(false)
   const [nameValue,    setNameValue]    = useState('')
   const [groupByOpen,  setGroupByOpen]  = useState(false)
   const groupByRef = useRef(null)
+  const filterStatusOptions = useMemo(() => {
+    const options = new Map(STATUS_OPTIONS.map((option) => [option.label, option]))
+    statusOptions.forEach((option) => options.set(option.label, option))
+    tasks.forEach((task) => {
+      if (task.status && !options.has(task.status)) {
+        options.set(task.status, { label: task.status, color: task.status_color || '#c4c4c4' })
+      }
+    })
+    return [...options.values()].filter((option) => option.label !== 'Done')
+  }, [statusOptions, tasks])
 
   useEffect(() => {
     if (!groupByOpen) return
@@ -56,7 +67,7 @@ export default function TopBar({
   }
 
   const activeFilterCount = filters
-    ? filters.assigneeIds.length +
+    ? (isMyTasks ? 0 : filters.assigneeIds.length) +
       filters.statuses.length +
       filters.priorities.length +
       (filters.dueThisWeek ? 1 : 0)
@@ -152,6 +163,7 @@ export default function TopBar({
           {onFilterToggle && (
             <button
               onClick={onFilterToggle}
+              aria-expanded={filterOpen}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition ${
                 filterOpen || activeFilterCount > 0
                   ? 'border-primary-blue text-primary-blue bg-blue-50 dark:bg-blue-900/20'
@@ -171,10 +183,11 @@ export default function TopBar({
           )}
 
           {/* Group By */}
-          {activeView === 'Main Table' && onGroupByChange && (
+          {(activeView === 'Main Table' || isMyTasks) && onGroupByChange && (
             <div className="relative" ref={groupByRef}>
               <button
                 onClick={() => setGroupByOpen((p) => !p)}
+                aria-expanded={groupByOpen}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition ${
                   groupByOpen || groupBy !== 'group'
                     ? 'border-primary-blue text-primary-blue bg-blue-50 dark:bg-blue-900/20'
@@ -267,7 +280,7 @@ export default function TopBar({
       {/* Filter bar */}
       {filterOpen && filters && (
         <div className="bg-white dark:bg-[#1e1e1e] border-b border-border-color dark:border-[#333] px-4 py-2.5 flex flex-wrap items-center gap-3 animate-dropdown">
-          {profiles.length > 0 && (
+          {!isMyTasks && profiles.length > 0 && (
             <FilterSection label="Assignee">
               {profiles.map((p) => (
                 <button
@@ -287,10 +300,11 @@ export default function TopBar({
           )}
 
           <FilterSection label="Status">
-            {STATUS_OPTIONS.map((s) => (
+            {filterStatusOptions.map((s) => (
               <button
                 key={s.label}
                 onClick={() => toggleStatus(s.label)}
+                aria-pressed={filters.statuses.includes(s.label)}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
                   filters.statuses.includes(s.label)
                     ? 'border-transparent text-white'
@@ -309,6 +323,7 @@ export default function TopBar({
               <button
                 key={p.label}
                 onClick={() => togglePriority(p.label)}
+                aria-pressed={filters.priorities.includes(p.label)}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
                   filters.priorities.includes(p.label)
                     ? 'border-transparent text-white'
@@ -323,6 +338,7 @@ export default function TopBar({
 
           <button
             onClick={() => onFiltersChange({ ...filters, dueThisWeek: !filters.dueThisWeek })}
+            aria-pressed={filters.dueThisWeek}
             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
               filters.dueThisWeek
                 ? 'bg-primary-blue/10 border-primary-blue text-primary-blue'

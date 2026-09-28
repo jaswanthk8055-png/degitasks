@@ -27,12 +27,16 @@ export default function BoardPage() {
   const [activeView,       setActiveView]       = useState(profile?.default_page || 'Main Table')
   const [selection,        setSelection]        = useState({ locationKey: location.key, task: undefined })
   const [filters,          setFilters]          = useState(EMPTY_FILTERS)
+  const [myTasksFilters,   setMyTasksFilters]   = useState(EMPTY_FILTERS)
   const [filterOpen,       setFilterOpen]       = useState(false)
   const [automationsOpen,  setAutomationsOpen]  = useState(false)
   const [groupBy,          setGroupBy]          = useState('group')
+  const [myTasksGroupBy,   setMyTasksGroupBy]   = useState('group')
   const [newTaskId,        setNewTaskId]        = useState(null)
   const [creatingTask,     setCreatingTask]     = useState(false)
   const isMyTasks = activeView === 'My Tasks'
+  const activeFilters = isMyTasks ? myTasksFilters : filters
+  const activeGroupBy = isMyTasks ? myTasksGroupBy : groupBy
 
   // Update document title when board changes
   useEffect(() => {
@@ -112,12 +116,12 @@ export default function BoardPage() {
         creatingTask={creatingTask || !currentUserId}
         onExport={handleExportCSV}
         onAutomations={() => setAutomationsOpen(true)}
-        filters={filters}
-        onFiltersChange={setFilters}
-        filterOpen={activeView === 'My Tasks' ? false : filterOpen}
-        onFilterToggle={activeView === 'My Tasks' ? null : () => setFilterOpen((p) => !p)}
-        groupBy={groupBy}
-        onGroupByChange={activeView === 'My Tasks' ? null : setGroupBy}
+        filters={activeFilters}
+        onFiltersChange={isMyTasks ? setMyTasksFilters : setFilters}
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((p) => !p)}
+        groupBy={activeGroupBy}
+        onGroupByChange={isMyTasks ? setMyTasksGroupBy : setGroupBy}
       />
 
       {(activeView === 'Main Table' || activeView === 'My Tasks') && (
@@ -127,12 +131,12 @@ export default function BoardPage() {
           ) : (
             <BoardTable
               filters={
-                activeView === 'My Tasks'
-                  ? { assigneeIds: currentUserId ? [currentUserId] : [], statuses: [], priorities: [], dueThisWeek: false }
-                  : filters
+                isMyTasks
+                  ? { ...myTasksFilters, assigneeIds: [currentUserId] }
+                  : activeFilters
               }
               onOpenTask={handleOpenTask}
-              groupBy={activeView === 'My Tasks' ? 'group' : groupBy}
+              groupBy={activeGroupBy}
               creationAssigneeId={isMyTasks ? currentUserId : null}
               filterMyProjects={isMyTasks}
               newTaskId={newTaskId}

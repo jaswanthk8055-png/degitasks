@@ -45,10 +45,14 @@ function loadWidths(boardId) {
   }
 }
 
-function buildVirtualGroups(groupBy, tasks, profiles) {
+function buildVirtualGroups(groupBy, tasks, profiles, statusOptions) {
   if (groupBy === 'status') {
     const present = new Set(tasks.map((t) => t.status || null))
-    const result = STATUS_OPTIONS
+    const options = new Map([...STATUS_OPTIONS, ...statusOptions].map((s) => [s.label, s]))
+    tasks.forEach((t) => {
+      if (t.status && !options.has(t.status)) options.set(t.status, { label: t.status, color: t.status_color || '#c4c4c4' })
+    })
+    const result = [...options.values()]
       .filter((s) => present.has(s.label))
       .map((s) => ({ id: `vg-s-${s.label}`, name: s.label, color: s.color, _vField: 'status', _vKey: s.label }))
     if (present.has(null)) result.push({ id: 'vg-s-null', name: 'No Status', color: '#c4c4c4', _vField: 'status', _vKey: null })
@@ -86,7 +90,7 @@ function buildVirtualGroups(groupBy, tasks, profiles) {
 
 export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false, creationAssigneeId = null, filterMyProjects = false, newTaskId = null }) {
   const {
-    groups, tasks, subGroups, profiles, boardColumns, automations,
+    groups, tasks, subGroups, profiles, boardColumns, statusOptions,
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
     createSubGroup, updateSubGroup, deleteSubGroup,
     currentBoard, logActivity,
@@ -144,20 +148,6 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       logActivity({ taskId, userId: profile?.id, action: 'status_changed', meta: { new_status: updates.status } })
       addToast(`Status → "${updates.status}"`)
 
-      // Run automations for status changes
-      for (const rule of automations) {
-        if (!rule.enabled) continue
-        if (rule.trigger.type === 'status_change' && rule.trigger.value === updates.status) {
-          if (rule.action.type === 'move_to_group') {
-            const targetGroupId = rule.action.groupId
-            // Mirror the section into the target group (find by name or create)
-            const newSubGroupId = await findOrCreateSubGroup(prevTask?.sub_group_id, targetGroupId)
-            await updateTask(taskId, { group_id: targetGroupId, sub_group_id: newSubGroupId })
-            const groupName = groups.find((g) => g.id === targetGroupId)?.name
-            if (groupName) addToast(`Moved to "${groupName}"`)
-          }
-        }
-      }
     }
     if ('assignee_ids' in updates) {
       const prevIds = prevTask?.assignee_ids ?? (prevTask?.assignee_id ? [prevTask.assignee_id] : [])
@@ -340,7 +330,13 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
 
   const sortedGroups   = [...groups].sort((a, b) => a.position - b.position)
   const visibleColumns = boardColumns.filter((c) => !c.hidden)
-  const virtualGroups  = buildVirtualGroups(groupBy, tasks, profiles)
+  const virtualGroups  = buildVirtualGroups(groupBy, tasks, profiles, statusOptions)
+  // Keep legacy or stale realtime rows accessible without presenting unfinished
+  // work as completed. The migration and shared update path repair placement.
+  const misplacedTasks = tasks.filter((task) => task.status !== 'Done'
+    && isCompletedTaskGroup(groups.find((group) => group.id === task.group_id)))
+    .filter(filterTask)
+    .sort((a, b) => a.position - b.position)
 
   const renderGroups = () => {
     if (virtualGroups) {
@@ -370,16 +366,18 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
             onWidthChange={handleWidthChange}
             isVirtual
             hideAddTask
+            showCompletedDate={groupBy === 'status' && vg._vKey === 'Done'}
           />
         )
       })
     }
     return sortedGroups.map((group) => {
+      const completedGroup = isCompletedTaskGroup(group)
       const groupTasks = tasks
         .filter((t) => t.group_id === group.id)
+        .filter((t) => !completedGroup || t.status === 'Done')
         .filter(filterTask)
         .sort((a, b) => a.position - b.position)
-      const completedGroup = isCompletedTaskGroup(group)
       if ((hideAddTask || (filterMyProjects && completedGroup)) && groupTasks.length === 0) return null
       const groupSubGroups = subGroups
         .filter((sg) => sg.group_id === group.id)
@@ -406,6 +404,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
           colWidths={colWidths}
           onWidthChange={handleWidthChange}
           hideAddTask={hideAddTask || completedGroup}
+          showCompletedDate={completedGroup}
           focusTaskId={newTaskId}
         />
       )
@@ -422,6 +421,21 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       <div className="flex-1 overflow-auto scrollbar-thin bg-white dark:bg-[#1a1a1a]">
         <div className="min-w-max">
           {renderGroups()}
+          {!virtualGroups && misplacedTasks.length > 0 && (
+            <TaskGroup
+              group={{ id: 'reopened-tasks', name: 'Active Tasks', color: '#0073ea' }}
+              tasks={misplacedTasks}
+              profiles={profiles}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onUpdateGroupName={() => {}}
+              onOpenTask={onOpenTask}
+              colWidths={colWidths}
+              onWidthChange={handleWidthChange}
+              isVirtual
+              hideAddTask
+            />
+          )}
 
           {/* Add Group — only for super user in default grouping */}
           {canEdit && !virtualGroups && (
@@ -492,6 +506,8 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
               onDelete={() => {}}
               extraColumns={visibleColumns}
               colWidths={colWidths}
+              showCompletedDate={activeTask.status === 'Done' && (groupBy === 'status'
+                || isCompletedTaskGroup(groups.find((g) => g.id === activeTask.group_id)))}
             />
           </div>
         )}

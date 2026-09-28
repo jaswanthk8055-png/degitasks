@@ -11,6 +11,8 @@ export const STATUS_OPTIONS = [
   { label: 'Done', color: '#00c875' },
   { label: 'Stuck', color: '#e2445c' },
   { label: 'In Review', color: '#0086c0' },
+  { label: 'Following Up', color: '#9d50dd' },
+  { label: 'On Hold', color: '#ff7575' },
 ]
 
 export const STATUS_COLORS = [

@@ -4,5 +4,6 @@ export const COL_DEFAULTS = {
   status:   140,
   assignee: 112,
   dueDate:  112,
+  completedDate: 144,
   priority: 112,
 }

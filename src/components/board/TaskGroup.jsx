@@ -5,6 +5,7 @@ import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
 import { GROUP_COLORS } from '../../lib/utils'
 import TaskRow from './TaskRow'
+import { COL_DEFAULTS } from './columnWidths'
 import Modal from '../ui/Modal'
 
 // Module-level so React never remounts it when TaskGroup re-renders (fixes rename losing focus)
@@ -125,6 +126,7 @@ export default function TaskGroup({
   isVirtual = false,
   hideAddTask = false,
   focusTaskId = null,
+  showCompletedDate = false,
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
   const { user } = useAuthStore()
@@ -228,7 +230,8 @@ export default function TaskGroup({
     setEditingSGId(null)
   }
 
-  const ungroupedTasks = tasks.filter((t) => !t.sub_group_id)
+  // Status/priority/assignee views are flat lists regardless of project membership.
+  const ungroupedTasks = isVirtual ? tasks : tasks.filter((t) => !t.sub_group_id)
 
   const handleAddColumn = async (e) => {
     e.preventDefault()
@@ -356,6 +359,7 @@ export default function TaskGroup({
             onRenameCancel={() => setRenamingColId(null)}
             colWidths={colWidths}
             onWidthChange={onWidthChange}
+            showCompletedDate={showCompletedDate}
           />
 
           <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
@@ -372,6 +376,7 @@ export default function TaskGroup({
                 autoFocus={task.id === newTaskId || task.id === focusTaskId}
                 extraColumns={visibleColumns}
                 colWidths={colWidths}
+                showCompletedDate={showCompletedDate}
               />
             ))}
 
@@ -415,6 +420,7 @@ export default function TaskGroup({
                           autoFocus={task.id === newTaskId || task.id === focusTaskId}
                           extraColumns={visibleColumns}
                           colWidths={colWidths}
+                          showCompletedDate={showCompletedDate}
                         />
                       ))}
                       {/* Add task inside sub-group */}
@@ -641,16 +647,17 @@ function ColumnHeaders({
   onRenameCancel,
   colWidths,
   onWidthChange,
+  showCompletedDate,
 }) {
   // Shared cell style for fixed columns
   const cell = (key, label, extra = '') => (
     <div
       key={key}
       className={`relative group/hdr flex-shrink-0 flex items-center px-3 h-8 text-[11px] font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wide border-r border-border-color dark:border-[#333] select-none ${extra}`}
-      style={{ width: colWidths[key] }}
+      style={{ width: colWidths[key] ?? COL_DEFAULTS[key] }}
     >
       {label}
-      <ResizeHandle colKey={key} currentWidth={colWidths[key]} onWidthChange={onWidthChange} />
+      <ResizeHandle colKey={key} currentWidth={colWidths[key] ?? COL_DEFAULTS[key]} onWidthChange={onWidthChange} />
     </div>
   )
 
@@ -673,6 +680,7 @@ function ColumnHeaders({
       {cell('status',   'Status')}
       {cell('assignee', 'Assignee')}
       {cell('dueDate',  'Due Date')}
+      {showCompletedDate && cell('completedDate', 'Completed Date')}
       {cell('priority', 'Priority')}
 
       {/* Custom columns */}

@@ -63,9 +63,19 @@ Tasks created using **New Task**, **Add task**, or **Add task to this project** 
 
 Groups named **Completed Tasks** or **Completed** have no task/project creation controls in either view. The header's **New Task** uses the first active group, creating a **Tasks** group if none exists.
 
+Use the **Move to project** arrow beside a task's name, or the **Project** field in Task Details, to move it into any project on the current board. This also works for tasks created without a project and includes empty projects hidden by My Tasks. Select **No project** to remove a task from its project while keeping it in its current group. Moving preserves the task's details, assignees, status, and updates; projects in another group move the task into that group as well.
+
 Status, priority and assignee dropdowns open above their trigger when space below is insufficient. Long lists scroll inside the menu so all choices remain reachable.
 
 The nightly cleanup requires one separate Supabase migration: `supabase/cleanup-empty-tasks.sql`. It installs a daily midnight India-time job, with a 24-hour untouched grace period, and keeps tasks containing entered information. Projects/groups, tasks with children, and child tasks with a parent are retained. Assignment alone does not protect an empty task: manual, automatic, multiple-assignee and unassigned tasks follow the same checks. Assignment changes restart the 24-hour grace period; other recorded activity still protects the task. See [the cleanup installation and dry-run guide](supabase/cleanup-empty-tasks.md) for full rules and rollout steps. The frontend build/deployment alone does not activate this database job. Apply only this new migration to the existing database; do not replay historical schema scripts.
+
+## Completed Tasks and My Tasks filters
+
+Apply **only** [`supabase/completed-tasks.sql`](supabase/completed-tasks.sql) in the existing Supabase SQL Editor **before deploying this frontend**. This additive, rerunnable migration adds `tasks.completed_date`, installs the completion safeguards, and moves existing unfinished tasks out of Completed Tasks. It requires the existing `sub_groups` table used by this app; do not replay the historical schema files. The local implementation and tests do not apply this migration to the hosted database.
+
+Marking a task **Done** records today's date in India time and moves it into the board's Completed Tasks section when one exists, preserving the project by name. The editable **Completed Date** column appears in completed sections (including the Done status grouping). Reopening a task clears that date and returns it to an active group, preferring a matching project. If no active group exists, a Tasks group is created. Status changes from Task Details, table rows, and the summary use the same save path. Unfinished tasks cannot be moved into a completed project. Existing Done tasks keep an empty completion date until edited; historical dates are not guessed from the last update time.
+
+My Tasks supports **Filter** and **Group by**, with selections retained separately from Main Table. It always remains restricted to your assigned tasks, including shared assignments. Assignee filters are hidden in My Tasks. All filter menus include **Following Up** and **On Hold** and omit **Done**; Done remains available when editing task status. The completion migration is covered by `npm run test:completion`, included in `npm run check`.
 
 ## Setting up a separate database
 

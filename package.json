@@ -11,10 +11,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",
-    "test": "npm run test:unit && npm run test:ui && npm run test:cleanup",
+    "test": "npm run test:unit && npm run test:ui && npm run test:cleanup && npm run test:completion",
     "test:unit": "node --test tests/*.test.js",
     "test:ui": "vitest run",
     "test:cleanup": "node supabase/tests/cleanup-empty-tasks.test.mjs",
+    "test:completion": "node supabase/tests/completed-tasks.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

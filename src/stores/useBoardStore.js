@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { randomGroupColor, loadStatusOptions, saveStatusOptionsToStorage } from '../lib/utils'
+import { isCompletedTaskGroup } from '../lib/taskGroups'
 
 function loadAutomationsCache(boardId) {
   try { return JSON.parse(localStorage.getItem(`board-automations-${boardId}`) || '[]') } catch { return [] }
@@ -182,7 +183,7 @@ export const useBoardStore = create((set, get) => ({
       .single()
     if (error) throw error
 
-    set((s) => ({ groups: [...s.groups, data] }))
+    set((s) => ({ groups: s.groups.some((g) => g.id === data.id) ? s.groups : [...s.groups, data] }))
     return data
   },
 
@@ -219,7 +220,7 @@ export const useBoardStore = create((set, get) => ({
       .select()
       .single()
     if (error) throw error
-    set((s) => ({ subGroups: [...s.subGroups, data] }))
+    set((s) => ({ subGroups: s.subGroups.some((sg) => sg.id === data.id) ? s.subGroups : [...s.subGroups, data] }))
     return data
   },
 
@@ -275,12 +276,136 @@ export const useBoardStore = create((set, get) => ({
     return data
   },
 
+  // All status editors (table, details, calendar and summary) use this path.
+  // Resolve the move before saving so status, project and date change together.
+  prepareTaskUpdates: async (task, updates) => {
+    const patch = { ...updates }
+    const { groups, subGroups, automations } = get()
+    const boardGroups = groups.filter((g) => g.board_id === task.board_id)
+      .sort((a, b) => a.position - b.position)
+    const status = 'status' in patch ? patch.status : task.status
+    const statusChanged = 'status' in patch && status !== task.status
+    let target = boardGroups.find((g) => g.id === (patch.group_id ?? task.group_id))
+    let projectId = 'sub_group_id' in patch ? patch.sub_group_id : task.sub_group_id
+    const sourceProject = subGroups.find((sg) => sg.id === projectId && sg.board_id === task.board_id)
+    const matchesProject = (sg) => sourceProject && sg.board_id === task.board_id
+      && (sg.name || '').trim().toLowerCase() === (sourceProject.name || '').trim().toLowerCase()
+
+    if (statusChanged && !('group_id' in patch)) {
+      // Keep existing automation order, but never send unfinished work into
+      // Completed Tasks even if an old automation is configured that way.
+      for (const rule of automations) {
+        if (!rule.enabled || rule.trigger?.type !== 'status_change'
+          || rule.trigger.value !== status || rule.action?.type !== 'move_to_group') continue
+        const destination = boardGroups.find((g) => g.id === rule.action.groupId)
+        if (destination && (status === 'Done' || !isCompletedTaskGroup(destination))) target = destination
+      }
+      if (status === 'Done') {
+        target = boardGroups.find(isCompletedTaskGroup) || target
+      }
+    }
+
+    if (status !== 'Done' && isCompletedTaskGroup(target)) {
+      // Prefer the original active project, whose name was mirrored when done.
+      const activeGroups = boardGroups.filter((g) => !isCompletedTaskGroup(g))
+      target = activeGroups.find((g) => subGroups.some((sg) => (
+        sg.group_id === g.id && matchesProject(sg)
+      ))) || activeGroups[0] || await get().createGroup(task.board_id, 'Tasks')
+    }
+
+    if (target && (target.id !== (patch.group_id ?? task.group_id)
+      || target.id !== task.group_id && !('sub_group_id' in patch))) {
+      const matchingProject = sourceProject && get().subGroups.find((sg) => (
+        sg.group_id === target.id && matchesProject(sg)
+      ))
+      projectId = sourceProject
+        ? (matchingProject || await get().createSubGroup(task.board_id, target.id, sourceProject.name)).id
+        : null
+      patch.group_id = target.id
+      patch.sub_group_id = projectId
+    }
+
+    const enteringCompleted = isCompletedTaskGroup(target)
+      && !isCompletedTaskGroup(boardGroups.find((g) => g.id === task.group_id))
+    if (status === 'Done' && (statusChanged || enteringCompleted && !task.completed_date)
+      && !patch.completed_date) {
+      // Use the same business timezone as the database fallback trigger.
+      patch.completed_date = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date())
+    } else if (status !== 'Done' && (task.completed_date || 'completed_date' in patch)) {
+      patch.completed_date = null
+    }
+    return patch
+  },
+
   updateTask: async (taskId, updates) => {
-    const { error } = await supabase.from('tasks').update(updates).eq('id', taskId)
+    const task = get().tasks.find((t) => t.id === taskId)
+    if (!task) throw new Error('This task is no longer available. Refresh and try again.')
+    const patch = await get().prepareTaskUpdates(task, updates)
+    const { data, error } = await supabase.from('tasks').update(patch).eq('id', taskId)
+      .eq('board_id', task.board_id).select().single()
     if (error) throw error
+    if (!data) throw new Error('The task could not be updated. Refresh and try again.')
+    // Use the persisted routing/date values if a database trigger repaired the
+    // task. Avoid overwriting unrelated edits received while this save waited.
+    const saved = { ...patch }
+    for (const key of [...Object.keys(patch), 'status', 'status_color', 'group_id', 'sub_group_id', 'completed_date', 'position']) {
+      if (key in data) saved[key] = data[key]
+    }
     set((s) => ({
-      tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
+      tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, ...saved } : t)),
     }))
+  },
+
+  moveTaskToProject: async (taskId, projectId) => {
+    const { tasks, subGroups, groups } = get()
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) throw new Error('This task is no longer available. Refresh and try again.')
+
+    const project = projectId === null ? null : subGroups.find((sg) => sg.id === projectId)
+    if (projectId !== null && (!project || project.board_id !== task.board_id)) {
+      throw new Error('Choose a project from this board.')
+    }
+
+    const groupId = project ? project.group_id : task.group_id
+    if (!groups.some((g) => g.id === groupId && g.board_id === task.board_id)) {
+      throw new Error('The destination group is no longer available. Refresh and try again.')
+    }
+    if (task.status !== 'Done' && isCompletedTaskGroup(groups.find((g) => g.id === groupId))) {
+      throw new Error('Mark this task as Done before moving it to Completed Tasks.')
+    }
+    if ((task.sub_group_id ?? null) === projectId && task.group_id === groupId) return task
+
+    const position = tasks.reduce((last, candidate) => (
+      candidate.id !== taskId && candidate.group_id === groupId && Number.isFinite(candidate.position)
+        ? Math.max(last, candidate.position)
+        : last
+    ), -1) + 1
+    let patch = { group_id: groupId, sub_group_id: projectId, position }
+    if (task.status === 'Done' && !task.completed_date
+      && groupId !== task.group_id && isCompletedTaskGroup(groups.find((g) => g.id === groupId))) {
+      patch = await get().prepareTaskUpdates(task, patch)
+    }
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(patch)
+      .eq('id', taskId)
+      .eq('board_id', task.board_id)
+      .select()
+      .single()
+    if (error) throw error
+    if (!data) throw new Error('The task could not be moved. Refresh and try again.')
+
+    // Preserve unrelated edits received while saving, and never reinsert a task
+    // that was deleted or removed by a board change during the request.
+    set((s) => ({
+      tasks: s.tasks.map((t) => t.id === taskId ? {
+        ...t, group_id: data.group_id, sub_group_id: data.sub_group_id, position: data.position,
+        ...('completed_date' in patch ? { completed_date: data.completed_date } : {}),
+      } : t),
+    }))
+    return data
   },
 
   deleteTask: async (taskId) => {

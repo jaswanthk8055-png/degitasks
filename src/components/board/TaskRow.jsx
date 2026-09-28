@@ -8,6 +8,7 @@ import StatusPill from './StatusPill'
 import PriorityPill from './PriorityPill'
 import AssigneePicker from './AssigneePicker'
 import DatePicker from './DatePicker'
+import TaskProjectPicker from './TaskProjectPicker'
 
 export default function TaskRow({
   task,
@@ -19,6 +20,7 @@ export default function TaskRow({
   autoFocus = false,
   extraColumns = [],
   colWidths = COL_DEFAULTS,
+  showCompletedDate = false,
 }) {
   const titleInputRef = useRef(null)
   const { taskColumnValues, updateColumnValue, memberProfiles } = useBoardStore()
@@ -121,6 +123,7 @@ export default function TaskRow({
             {task.title || <span className="text-gray-400 dark:text-gray-600 italic text-xs">Click to name</span>}
           </span>
         )}
+        <TaskProjectPicker task={task} compact />
         <button
           onClick={(e) => { e.stopPropagation(); onOpenDetail?.(task) }}
           className="flex-shrink-0 ml-1 text-gray-300 hover:text-primary-blue opacity-0 group-hover/row:opacity-100 transition p-0.5 rounded"
@@ -147,6 +150,20 @@ export default function TaskRow({
       <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('dueDate')}>
         <DatePicker dueDate={task.due_date} taskId={task.id} onUpdate={onUpdate} />
       </div>
+
+      {/* Completed Date */}
+      {showCompletedDate && (
+        <div className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('completedDate')}>
+          <DatePicker
+            dueDate={task.completed_date}
+            taskId={task.id}
+            onUpdate={onUpdate}
+            field="completed_date"
+            label="Completed date"
+            highlightOverdue={false}
+          />
+        </div>
+      )}
 
       {/* Priority */}
       <div className="flex-shrink-0 flex items-center px-1 h-9 border-r border-border-color dark:border-[#2a2a2a]" style={fw('priority')}>

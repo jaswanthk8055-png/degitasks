@@ -7,6 +7,7 @@ import StatusPill from './StatusPill'
 import AssigneePicker from './AssigneePicker'
 import DatePicker from './DatePicker'
 import PriorityPill from './PriorityPill'
+import TaskProjectPicker from './TaskProjectPicker'
 import Avatar from '../ui/Avatar'
 import RichTextEditor from '../ui/RichTextEditor'
 
@@ -190,6 +191,9 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
 
         {/* Fields */}
         <div className="px-5 pb-4 space-y-3 border-b border-border-color">
+          <FieldRow label="Project">
+            <TaskProjectPicker task={task} />
+          </FieldRow>
           <FieldRow label="Status">
             <StatusPill
               status={task.status}

@@ -2,12 +2,15 @@ import { useState, useRef } from 'react'
 import { STATUS_COLORS } from '../../lib/utils'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
+import { useToastStore } from '../../stores/useToastStore'
 import Dropdown from '../ui/Dropdown'
 import Modal from '../ui/Modal'
 
 export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
   const [open, setOpen] = useState(false)
   const [managing, setManaging] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const btnRef = useRef(null)
 
   const { statusOptions, currentBoard, updateStatusOptions } = useBoardStore()
@@ -16,9 +19,19 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
 
   const options = statusOptions.length > 0 ? statusOptions : []
 
-  const handleSelect = (option) => {
+  const handleSelect = async (option) => {
+    if (savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
     setOpen(false)
-    onUpdate(taskId, { status: option.label, status_color: option.color })
+    try {
+      await onUpdate(taskId, { status: option.label, status_color: option.color })
+    } catch (error) {
+      useToastStore.getState().addToast(error.message || 'Could not update status', 'error')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   const color = statusColor || options.find((o) => o.label === status)?.color || '#c4c4c4'
@@ -27,6 +40,8 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
     <div className="relative w-full">
       <button
         ref={btnRef}
+        disabled={saving}
+        aria-busy={saving}
         onClick={() => setOpen((p) => !p)}
         className="w-full h-6 px-2 rounded text-[11px] font-semibold text-white transition hover:opacity-85 focus:outline-none truncate"
         style={{ backgroundColor: color }}
@@ -38,7 +53,7 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
         {options.map((opt) => (
           <button
             key={opt.label}
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
             onClick={() => handleSelect(opt)}
             className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-300 transition"
           >

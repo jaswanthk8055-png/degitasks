@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import BoardPage from '../src/pages/BoardPage'
 import { useAuthStore } from '../src/stores/useAuthStore'
@@ -193,7 +193,7 @@ function existingTask(overrides = {}) {
 }
 
 describe('My Tasks project visibility and completed groups', () => {
-  it('hides existing empty and colleague-only projects in My Tasks, while Main Table shows them', () => {
+  it('hides empty projects in both views, while Main Table shows colleague projects containing tasks', () => {
     renderBoard({
       subGroups: [
         { id: 'colleague-project', board_id: BOARD_ID, group_id: GROUP_ID, name: 'Colleague Project', position: 0 },
@@ -210,12 +210,12 @@ describe('My Tasks project visibility and completed groups', () => {
     expect(screen.queryByText('Colleague-only task')).toBeNull()
     expect(screen.queryByText('+ Add task to this project', { exact: true })).toBeNull()
     // The active group itself still offers a place to create work.
-    expect(screen.getByText('+ Add Project', { exact: true })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Add Project$/ })).toBeTruthy()
     expect(screen.getByText('+ Add task', { exact: true })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /^Main Table$/ }))
     expect(screen.getByText('Colleague Project')).toBeTruthy()
-    expect(screen.getByText('Existing Empty Project')).toBeTruthy()
+    expect(screen.queryByText('Existing Empty Project')).toBeNull()
     expect(screen.getByText('Colleague-only task')).toBeTruthy()
   })
 
@@ -298,7 +298,7 @@ describe('My Tasks project visibility and completed groups', () => {
   it('allows creation in an ordinary group even when all its current tasks are Done', () => {
     renderBoard({ tasks: [existingTask({ status: 'Done', title: 'Finished task in active group' })] })
     expect(screen.getByText('Finished task in active group')).toBeTruthy()
-    expect(screen.getByText('+ Add Project', { exact: true })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Add Project$/ })).toBeTruthy()
     expect(screen.getByText('+ Add task', { exact: true })).toBeTruthy()
   })
 })
@@ -336,9 +336,9 @@ describe('My Tasks creation through the board UI and store', () => {
 
   it('keeps an empty new project visible and creates a self-assigned task inside it', async () => {
     renderBoard()
-    fireEvent.click(screen.getByText('+ Add Project', { exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: /^Add Project$/ }))
     fireEvent.change(screen.getByPlaceholderText('Project name…'), { target: { value: 'New Client Project' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Add$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Create project$/ }))
 
     expect(await screen.findByText('New Client Project')).toBeTruthy()
     expect(taskInserts()).toHaveLength(0)
@@ -394,5 +394,157 @@ describe('My Tasks creation through the board UI and store', () => {
     expect(payload.assignee_ids ?? []).toEqual([])
     const activity = writes.find((write) => write.table === 'activity_log')
     expect(activity?.payload.meta.auto_assigned_user_id).toBeUndefined()
+  })
+})
+
+describe('project creation and existing project search from the header', () => {
+  const projects = [
+    { id: 'shipping-project', board_id: BOARD_ID, group_id: GROUP_ID, name: 'Client Shipping Plan', position: 0 },
+    { id: 'empty-project', board_id: BOARD_ID, group_id: GROUP_ID, name: 'Client Billing', position: 1 },
+    { id: 'foreign-project', board_id: 'other-board', group_id: 'foreign-group', name: 'Client Other Board', position: 0 },
+  ]
+
+  function openDialog() {
+    fireEvent.click(screen.getByRole('button', { name: /^Add Project$/ }))
+    return screen.getByRole('dialog', { name: 'Add Project' })
+  }
+
+  it('filters names by a case-insensitive substring and selects a hidden project without creating a duplicate', async () => {
+    localStorage.setItem(`group-collapsed-${GROUP_ID}`, 'true')
+    renderBoard({ subGroups: projects, tasks: [existingTask({ title: 'Colleague-only task', sub_group_id: 'shipping-project', assignee_id: OTHER_USER_ID, assignee_ids: [OTHER_USER_ID] })] })
+    expect(screen.queryByText('Client Shipping Plan')).toBeNull()
+    expect(screen.queryByText('+ Add Project', { exact: true })).toBeNull()
+
+    const dialog = openDialog()
+    const name = within(dialog).getByRole('textbox', { name: 'Project name' })
+    expect(document.activeElement).toBe(name)
+    fireEvent.change(name, { target: { value: 'sHiP' } })
+    expect(within(dialog).getByRole('button', { name: 'Select project Client Shipping Plan in To Do' })).toBeTruthy()
+    expect(within(dialog).queryByText('Client Billing')).toBeNull()
+    expect(within(dialog).queryByText('Client Other Board')).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Select project Client Shipping Plan in To Do' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add Project' })).toBeNull())
+    expect(screen.queryByRole('dialog', { name: 'Add Project' })).toBeNull()
+    expect(await screen.findByText('Client Shipping Plan')).toBeTruthy()
+    expect(screen.queryByText('Colleague-only task')).toBeNull()
+    expect(screen.getByText('+ Add task to this project', { exact: true })).toBeTruthy()
+    expect(writes).toEqual([])
+    expect(localStorage.getItem(`group-collapsed-${GROUP_ID}`)).toBe('false')
+  })
+
+  it('blocks exact duplicate names regardless of case and whitespace, including direct form submission', () => {
+    renderBoard({ subGroups: projects })
+    const dialog = openDialog()
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Project name' }), { target: { value: '  CLIENT   shipping plan  ' } })
+    expect(within(dialog).getByRole('status').textContent).toContain('already exists')
+    expect(within(dialog).getByRole('button', { name: 'Create project' }).disabled).toBe(true)
+    fireEvent.submit(dialog.querySelector('form'))
+    expect(within(dialog).getByRole('alert').textContent).toContain('already exists')
+    expect(writes).toEqual([])
+  })
+
+  it('creates a new project in the selected active group and excludes completed groups as destinations', async () => {
+    renderBoard({ groups: [
+      { id: 'completed-group', board_id: BOARD_ID, name: 'Completed Tasks', color: '#00c875', position: 0 },
+      { id: GROUP_ID, board_id: BOARD_ID, name: 'To Do', color: '#0073ea', position: 1 },
+      { id: 'progress-group', board_id: BOARD_ID, name: 'In Progress', color: '#fdab3d', position: 2 },
+    ] })
+    const dialog = openDialog()
+    const destination = within(dialog).getByRole('combobox', { name: 'Group for new project' })
+    expect(within(destination).queryByRole('option', { name: 'Completed Tasks' })).toBeNull()
+    fireEvent.change(destination, { target: { value: 'progress-group' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Project name' }), { target: { value: '  New Client Project  ' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create project' }))
+    expect(await screen.findByText('New Client Project')).toBeTruthy()
+    expect(writes.filter((write) => write.table === 'sub_groups')).toEqual([
+      expect.objectContaining({ action: 'insert', payload: expect.objectContaining({ board_id: BOARD_ID, group_id: 'progress-group', name: 'New Client Project' }) }),
+    ])
+    expect(taskInserts()).toHaveLength(0)
+  })
+
+  it.each([
+    ['empty', []],
+    ['completed only', [{ id: 'completed-group', board_id: BOARD_ID, name: 'Completed Tasks', color: '#00c875', position: 0 }]],
+  ])('creates an active group when the board is %s', async (_label, groups) => {
+    renderBoard({ groups, tasks: [] })
+    const dialog = openDialog()
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Project name' }), { target: { value: 'First Project' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create project' }))
+    expect(await screen.findByText('First Project')).toBeTruthy()
+    expect(writes.filter((write) => write.table === 'groups')).toHaveLength(1)
+    expect(writes.find((write) => write.table === 'sub_groups').payload.group_id).toBe('new-group-1')
+    expect(taskInserts()).toHaveLength(0)
+  })
+
+  it('keeps the dialog open after a save error, then prevents repeated submission while retrying', async () => {
+    renderBoard()
+    const originalCreate = useBoardStore.getState().createSubGroup
+    const create = vi.fn().mockRejectedValueOnce(new Error('Project permission denied'))
+    let finishSave
+    create.mockImplementationOnce((boardId, groupId, name) => new Promise((resolve) => {
+      finishSave = () => {
+        const project = { id: 'retry-project', board_id: boardId, group_id: groupId, name, position: 0 }
+        useBoardStore.setState({ subGroups: [project] })
+        resolve(project)
+      }
+    }))
+    useBoardStore.setState({ createSubGroup: create })
+    const dialog = openDialog()
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Project name' }), { target: { value: 'Retry Project' } })
+    fireEvent.submit(dialog.querySelector('form'))
+    expect((await within(dialog).findByRole('alert')).textContent).toContain('Project permission denied')
+    fireEvent.submit(dialog.querySelector('form'))
+    fireEvent.submit(dialog.querySelector('form'))
+    expect(create).toHaveBeenCalledTimes(2)
+    expect(within(dialog).getByRole('button', { name: 'Creating…' }).disabled).toBe(true)
+    await act(async () => finishSave())
+    expect(await screen.findByText('Retry Project')).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    useBoardStore.setState({ createSubGroup: originalCreate })
+  })
+})
+
+describe('empty project rows after task completion', () => {
+  const completedGroup = { id: 'completed-group', board_id: BOARD_ID, name: 'Completed Tasks', color: '#00c875', position: 1 }
+  const activeProject = { id: 'active-delivery', board_id: BOARD_ID, group_id: GROUP_ID, name: 'Delivery', position: 0 }
+  const completedProject = { ...activeProject, id: 'completed-delivery', group_id: completedGroup.id }
+
+  it.each(['Main Table', 'My Tasks'])('shows only the populated completed counterpart in %s', (view) => {
+    renderBoard({ view, groups: [
+      { id: GROUP_ID, board_id: BOARD_ID, name: 'To Do', color: '#0073ea', position: 0 }, completedGroup,
+    ], subGroups: [activeProject, completedProject], tasks: [existingTask({
+      sub_group_id: completedProject.id, group_id: completedGroup.id, title: 'Finished delivery', status: 'Done',
+    })] })
+    const active = screen.getByRole('button', { name: 'Collapse group To Do' }).closest('.mb-2')
+    const completed = screen.getByRole('button', { name: 'Collapse group Completed Tasks' }).closest('.mb-2')
+    expect(within(active).queryByText('Delivery')).toBeNull()
+    expect(within(active).queryByText('+ Add task to this project', { exact: true })).toBeNull()
+    expect(within(completed).getByText('Delivery')).toBeTruthy()
+    expect(within(completed).getByText('Finished delivery')).toBeTruthy()
+    expect(useBoardStore.getState().subGroups).toHaveLength(2)
+  })
+
+  it.each(['Main Table', 'My Tasks'])('reveals a selected empty project then hides it after its first task is completed in %s', async (view) => {
+    renderBoard({ view, groups: [
+      { id: GROUP_ID, board_id: BOARD_ID, name: 'To Do', color: '#0073ea', position: 0 }, completedGroup,
+    ], subGroups: [activeProject, completedProject], tasks: [] })
+    fireEvent.click(screen.getByRole('button', { name: 'Add Project', exact: true }))
+    const dialog = screen.getByRole('dialog', { name: 'Add Project' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Select project Delivery in To Do' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.getByText('Delivery')).toBeTruthy()
+    fireEvent.click(screen.getByText('+ Add task to this project', { exact: true }))
+    await screen.findByRole('textbox', { name: 'Task name' })
+    const task = useBoardStore.getState().tasks.find((item) => item.id === 'new-task-1')
+    expect(task.sub_group_id).toBe(activeProject.id)
+    await act(async () => {
+      await useBoardStore.getState().updateTask(task.id, { title: 'New delivery', status: 'Done', status_color: '#00c875' })
+    })
+    const active = screen.getByRole('button', { name: 'Collapse group To Do' }).closest('.mb-2')
+    const completed = screen.getByRole('button', { name: 'Collapse group Completed Tasks' }).closest('.mb-2')
+    expect(within(active).queryByText('Delivery')).toBeNull()
+    expect(within(completed).getByText('Delivery')).toBeTruthy()
+    expect(useBoardStore.getState().tasks[0]).toMatchObject({ group_id: completedGroup.id, sub_group_id: completedProject.id })
   })
 })

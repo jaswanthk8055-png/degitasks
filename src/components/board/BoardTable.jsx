@@ -31,6 +31,7 @@ import TaskGroup from './TaskGroup'
 import TaskRow from './TaskRow'
 import { COL_DEFAULTS } from './columnWidths'
 import { isCompletedTaskGroup } from '../../lib/taskGroups'
+import { normalizeProjectName } from '../../lib/taskProjects'
 
 
 const MIN_WIDTH = 60
@@ -88,7 +89,7 @@ function buildVirtualGroups(groupBy, tasks, profiles, statusOptions) {
   return null
 }
 
-export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false, creationAssigneeId = null, filterMyProjects = false, newTaskId = null }) {
+export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hideAddTask = false, creationAssigneeId = null, filterMyProjects = false, newTaskId = null, selectedProjectIds = [], focusProjectId = null, focusProjectRequestId = null }) {
   const {
     groups, tasks, subGroups, profiles, boardColumns, statusOptions,
     createGroup, createTask, updateTask, deleteTask, updateGroupName, deleteGroup,
@@ -102,9 +103,6 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
   const [activeTask, setActiveTask]   = useState(null)
   const [addingGroup, setAddingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
-  // Keep only this user's newly created empty project visible while they add
-  // its first task. Existing projects must have a matching task in My Tasks.
-  const [draftProjects, setDraftProjects] = useState([])
   const currentUserId = user?.id || profile?.id
 
   // ── Column widths ──────────────────────────────────────────────────
@@ -133,7 +131,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     const source = subGroups.find((sg) => sg.id === sourceSubGroupId)
     if (!source) return null
     const existing = subGroups.find(
-      (sg) => sg.group_id === targetGroupId && sg.name === source.name
+      (sg) => sg.group_id === targetGroupId && normalizeProjectName(sg.name) === normalizeProjectName(source.name)
     )
     if (existing) return existing.id
     const created = await createSubGroup(currentBoard.id, targetGroupId, source.name)
@@ -290,7 +288,6 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     try {
       const task = await createTask(currentBoard.id, groupId, currentUserId, subGroupId, { assignToCreator: !!creationAssigneeId })
       if (task) {
-        setDraftProjects((projects) => projects.filter((project) => project.id !== subGroupId))
         addToast('Task created')
       }
       return task
@@ -298,15 +295,6 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       addToast(error.message || 'Could not create task', 'error')
       return null
     }
-  }
-
-  const handleAddProject = async (groupId, name) => {
-    if (!currentBoard || isCompletedTaskGroup(groups.find((group) => group.id === groupId))) return null
-    const project = await createSubGroup(currentBoard.id, groupId, name)
-    if (filterMyProjects && project) {
-      setDraftProjects((projects) => [...projects, { id: project.id, userId: currentUserId }])
-    }
-    return project
   }
 
   const [taskToDelete, setTaskToDelete] = useState(null)
@@ -400,12 +388,13 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
         .filter((t) => !completedGroup || t.status === 'Done')
         .filter(filterTask)
         .sort((a, b) => a.position - b.position)
-      if ((hideAddTask || (filterMyProjects && completedGroup)) && groupTasks.length === 0) return null
+      const hasSelectedProject = subGroups.some((project) => project.group_id === group.id && selectedProjectIds.includes(project.id))
+      if ((hideAddTask || (filterMyProjects && completedGroup)) && groupTasks.length === 0 && !hasSelectedProject) return null
       const groupSubGroups = subGroups
         .filter((sg) => sg.group_id === group.id)
+        .filter((sg) => tasks.some((task) => task.sub_group_id === sg.id) || selectedProjectIds.includes(sg.id))
         .filter((sg) => !filterMyProjects || groupTasks.some((task) => task.sub_group_id === sg.id)
-          || (!completedGroup && draftProjects.some((project) => project.id === sg.id && project.userId === currentUserId)
-            && !tasks.some((task) => task.sub_group_id === sg.id)))
+          || selectedProjectIds.includes(sg.id))
         .sort((a, b) => a.position - b.position)
       return (
         <TaskGroup
@@ -419,7 +408,6 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
           onDeleteTask={handleDeleteTask}
           onUpdateGroupName={updateGroupName}
           onDeleteGroup={handleDeleteGroup}
-          onAddSubGroup={(name) => handleAddProject(group.id, name)}
           onUpdateSubGroup={updateSubGroup}
           onDeleteSubGroup={deleteSubGroup}
           onOpenTask={onOpenTask}
@@ -428,6 +416,8 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
           hideAddTask={hideAddTask || completedGroup}
           showCompletedDate={completedGroup}
           focusTaskId={newTaskId}
+          focusProjectId={focusProjectId}
+          focusProjectRequestId={focusProjectRequestId}
         />
       )
     })

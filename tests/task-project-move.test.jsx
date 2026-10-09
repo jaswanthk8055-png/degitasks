@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import BoardPage from '../src/pages/BoardPage'
+import TaskRow from '../src/components/board/TaskRow'
 import { useAuthStore } from '../src/stores/useAuthStore'
 import { useBoardStore } from '../src/stores/useBoardStore'
 import { useToastStore } from '../src/stores/useToastStore'
@@ -59,7 +60,7 @@ function installDatabaseDouble() {
   })
 }
 
-function renderBoard({ projectId = null, view = 'My Tasks' } = {}) {
+function renderBoard({ projectId = null, view = 'My Tasks', title = TASK_TITLE } = {}) {
   const profile = { id: USER_ID, full_name: 'Team Member', email: 'member@example.test', default_page: view }
   const colleague = { id: 'member-2', full_name: 'Colleague' }
   const board = { id: BOARD_ID, workspace_id: 'workspace-1', name: 'Team Work', icon: '📋' }
@@ -68,7 +69,7 @@ function renderBoard({ projectId = null, view = 'My Tasks' } = {}) {
     board_id: BOARD_ID,
     group_id: 'group-1',
     sub_group_id: projectId,
-    title: TASK_TITLE,
+    title,
     description: 'Keep these shipment details',
     assignee_id: USER_ID,
     assignee_ids: [USER_ID],
@@ -142,6 +143,59 @@ afterEach(() => {
 })
 
 describe('moving tasks between projects through the board UI', () => {
+  it('keeps named tasks opening details when a stale creation autofocus flag reaches a remounted row', () => {
+    const { task, rerender } = renderBoard()
+    const onOpenDetail = vi.fn()
+    const props = {
+      task, groupColor: '#0073ea', profiles: useBoardStore.getState().profiles,
+      onUpdate: vi.fn(), onDelete: vi.fn(), onOpenDetail,
+    }
+    // Switching table grouping remounts rows while the last-created ID remains set.
+    rerender(<TaskRow {...props} autoFocus />)
+    expect(screen.queryByRole('textbox', { name: 'Task name' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: TASK_TITLE, exact: true }))
+    expect(onOpenDetail).toHaveBeenCalledWith(task)
+
+    // The same rule applies when the autofocus flag arrives after mounting.
+    rerender(<TaskRow {...props} autoFocus={false} />)
+    rerender(<TaskRow {...props} autoFocus />)
+    expect(screen.queryByRole('textbox', { name: 'Task name' })).toBeNull()
+    expect(screen.getByRole('button', { name: TASK_TITLE, exact: true })).toBeTruthy()
+  })
+
+  it('opens task details from its name and keeps title editing in the details panel', async () => {
+    renderBoard()
+    expect(screen.queryByTitle('Open details')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: TASK_TITLE, exact: true }))
+    expect(screen.getByText('Task Details')).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'Task name' })).toBeNull()
+    expect(writes).toHaveLength(0)
+
+    const heading = screen.getByRole('heading', { name: TASK_TITLE })
+    const titleSection = heading.parentElement
+    fireEvent.click(within(heading).getByRole('button', { name: `Edit task name: ${TASK_TITLE}` }))
+    const input = within(titleSection).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'Updated shipping plan' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(movedTask().title).toBe('Updated shipping plan'))
+    expect(writes[0].payload).toEqual({ title: 'Updated shipping plan' })
+    expect(screen.getByRole('button', { name: 'Updated shipping plan', exact: true })).toBeTruthy()
+  })
+
+  it('lets an unnamed task be named inline before opening its details', async () => {
+    renderBoard({ title: '' })
+    fireEvent.click(screen.getByRole('button', { name: 'Click to name' }))
+    const input = screen.getByRole('textbox', { name: 'Task name' })
+    expect(document.activeElement).toBe(input)
+    fireEvent.change(input, { target: { value: TASK_TITLE } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(movedTask().title).toBe(TASK_TITLE))
+    expect(screen.queryByText('Task Details')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: TASK_TITLE, exact: true }))
+    expect(screen.getByText('Task Details')).toBeTruthy()
+  })
+
   it('lets My Tasks move an unprojected task into an empty project hidden by the view', async () => {
     const { container, task } = renderBoard()
     expect(screen.queryByText('Empty Project')).toBeNull()
@@ -262,7 +316,7 @@ describe('moving tasks between projects through the board UI', () => {
 
   it('supports the detail panel without portal clicks or menu Escape closing the panel', async () => {
     renderBoard({ projectId: 'source-project' })
-    fireEvent.click(screen.getByTitle('Open details'))
+    fireEvent.click(screen.getByRole('button', { name: TASK_TITLE, exact: true }))
     expect(screen.getByText('Task Details')).toBeTruthy()
     // The panel delays its outside-click listener to ignore the opening click.
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)) })

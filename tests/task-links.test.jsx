@@ -32,6 +32,7 @@ vi.mock('../src/components/board/BoardTable', () => ({ default: TaskButtons }))
 vi.mock('../src/components/board/KanbanView', () => ({ default: TaskButtons }))
 vi.mock('../src/components/board/CalendarView', () => ({ default: TaskButtons }))
 vi.mock('../src/components/board/AutomationsPanel', () => ({ default: () => null }))
+vi.mock('../src/components/board/NewProjectDialog', () => ({ default: () => null }))
 vi.mock('../src/components/board/TaskDetailPanel', () => ({
   default: ({ task, onClose }) => (
     <section role="dialog" aria-label={`Details ${task.title}`}>

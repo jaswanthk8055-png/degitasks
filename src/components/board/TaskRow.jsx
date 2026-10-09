@@ -36,14 +36,14 @@ export default function TaskRow({
   const committingTitle = useRef(false)
   const cancelTitle = useRef(false)
 
-  const [editingTitle, setEditingTitle] = useState(autoFocus)
+  const [editingTitle, setEditingTitle] = useState(autoFocus && !task.title?.trim())
   const [titleValue, setTitleValue] = useState(task.title || '')
   const [previousAutoFocus, setPreviousAutoFocus] = useState(autoFocus)
 
   // A newly created row may receive its autofocus flag after it first mounts.
   if (autoFocus !== previousAutoFocus) {
     setPreviousAutoFocus(autoFocus)
-    if (autoFocus) {
+    if (autoFocus && !task.title?.trim()) {
       setTitleValue(task.title || '')
       setEditingTitle(true)
     }
@@ -129,7 +129,7 @@ export default function TaskRow({
         )}
       </div>
 
-      {/* Keep inline naming and a separate, keyboard-accessible details action. */}
+      {/* Named tasks open details; new and unnamed tasks keep inline naming. */}
       <div
         className="flex-shrink-0 flex items-center px-2 h-9 border-r border-border-color dark:border-[#2a2a2a] overflow-hidden"
         style={{ width: colWidths.title ?? COL_DEFAULTS.title }}
@@ -152,26 +152,16 @@ export default function TaskRow({
           <button
             ref={titleButtonRef}
             type="button"
-            aria-label={`Edit task name: ${taskTitle}`}
             className="flex-1 min-w-0 text-left text-sm text-gray-900 dark:text-gray-100 hover:text-primary-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-blue transition truncate"
             onClick={() => {
-              cancelTitle.current = false
-              setTitleValue(task.title || '')
-              setEditingTitle(true)
+              if (task.title?.trim()) onOpenDetail?.(task)
+              else { cancelTitle.current = false; setTitleValue(task.title || ''); setEditingTitle(true) }
             }}
           >
             {task.title?.trim() ? task.title : <span className="text-gray-400 dark:text-gray-600 italic text-xs">Click to name</span>}
           </button>
         )}
         <TaskProjectPicker task={task} compact />
-        <button type="button"
-          onClick={(event) => { event.stopPropagation(); onOpenDetail?.(task) }}
-          className="flex-shrink-0 ml-1 text-gray-300 hover:text-primary-blue opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100 focus-visible:ring-2 focus-visible:ring-primary-blue transition p-0.5 rounded"
-          title="Open details" aria-label={`Open details for "${taskTitle}"`}>
-          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
         <span role="status" aria-live="polite" aria-atomic="true" title={feedback.message}
           className={`ml-1 text-[10px] flex-shrink-0 ${feedback.state === 'error' ? 'text-red-600' : 'text-gray-400'}`}>
           {feedback.state === 'error' ? 'Save failed' : feedback.message}

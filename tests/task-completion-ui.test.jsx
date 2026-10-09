@@ -63,7 +63,7 @@ function seedAndRender(status) {
 }
 
 async function changeStatusInDetails(previous, next) {
-  fireEvent.click(screen.getByRole('button', { name: `Open details for "${TASK_TITLE}"`, exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: TASK_TITLE, exact: true }))
   const panel = screen.getByText('Task Details').parentElement.parentElement
   // Exercise actual portal interaction after the panel's outside-click handler exists.
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)) })

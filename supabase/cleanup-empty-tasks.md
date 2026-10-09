@@ -11,7 +11,11 @@ task creation/assignment protects the task. Empty rich text such as
 `<div><br></div>` is treated as blank; images, links
 and unknown markup are preserved. Saved checkbox `false`, numeric `0`, and even
 deliberately cleared custom cells count as intentional interaction. Projects,
-groups and boards are not cleaned up.
+groups and boards are not cleaned up by this base migration. To extend the same
+midnight job to remove projects that have no task references, install
+[`cleanup-empty-projects.sql`](cleanup-empty-projects.sql) afterward and follow
+the [project cleanup guide](cleanup-empty-projects.md). Do not rerun this base
+migration afterward, since it restores the task-only schedule.
 
 A task with any child task is also retained, even when both rows are empty, so
 deleting an empty parent cannot cascade into its children. Child tasks with a

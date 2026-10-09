@@ -9,6 +9,7 @@ import BoardTable from '../components/board/BoardTable'
 import KanbanView from '../components/board/KanbanView'
 import CalendarView from '../components/board/CalendarView'
 import TaskDetailPanel from '../components/board/TaskDetailPanel'
+import NewProjectDialog from '../components/board/NewProjectDialog'
 import AutomationsPanel from '../components/board/AutomationsPanel'
 import { isCompletedTaskGroup } from '../lib/taskGroups'
 
@@ -19,7 +20,7 @@ export default function BoardPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { loading, error: boardError } = useBoard(boardId)
-  const { groups, tasks, createTask, createGroup, currentBoard, updateTask, profiles } =
+  const { groups, tasks, subGroups, createTask, createGroup, currentBoard, updateTask, profiles } =
     useBoardStore()
   const { profile, user } = useAuthStore()
   const currentUserId = user?.id || profile?.id
@@ -34,9 +35,29 @@ export default function BoardPage() {
   const [myTasksGroupBy,   setMyTasksGroupBy]   = useState('group')
   const [newTaskId,        setNewTaskId]        = useState(null)
   const [creatingTask,     setCreatingTask]     = useState(false)
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
+  const [projectNavigation, setProjectNavigation] = useState(null)
   const isMyTasks = activeView === 'My Tasks'
   const activeFilters = isMyTasks ? myTasksFilters : filters
   const activeGroupBy = isMyTasks ? myTasksGroupBy : groupBy
+  const currentProjectNavigation = projectNavigation?.boardId === boardId && projectNavigation?.userId === currentUserId
+    ? projectNavigation : null
+
+  // A selected empty project is a draft until its first task appears. Once a
+  // project has tasks, completing/moving its last task must hide its empty row.
+  if (currentProjectNavigation) {
+    const previousProjects = currentProjectNavigation.projects || []
+    const projects = previousProjects.flatMap((project) => {
+      if (!subGroups.some((item) => item.id === project.id)) return []
+      const hasTasks = tasks.some((task) => task.board_id === boardId && task.sub_group_id === project.id)
+      if (project.hadTasks && !hasTasks) return []
+      return [{ ...project, hadTasks: project.hadTasks || hasTasks }]
+    })
+    if (projects.length !== previousProjects.length
+      || projects.some((project, index) => project.hadTasks !== previousProjects[index].hadTasks)) {
+      setProjectNavigation({ ...currentProjectNavigation, projects })
+    }
+  }
 
   // Update document title when board changes
   useEffect(() => {
@@ -104,6 +125,21 @@ export default function BoardPage() {
     navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { state })
   }
 
+  const handleSelectProject = (project) => {
+    if (isMyTasks) setMyTasksGroupBy('group')
+    else { setActiveView('Main Table'); setGroupBy('group') }
+    setProjectNavigation((previous) => ({
+      boardId,
+      userId: currentUserId,
+      focusedId: project.id,
+      projects: [
+        ...(previous?.boardId === boardId && previous?.userId === currentUserId
+          ? (previous.projects || []).filter((item) => item.id !== project.id) : []),
+        { id: project.id, hadTasks: tasks.some((task) => task.board_id === boardId && task.sub_group_id === project.id) },
+      ],
+    }))
+  }
+
   const handleExportCSV = () => {
     if (!currentBoard || !tasks.length) return
     const rows = [['Task', 'Status', 'Assignee', 'Due Date', 'Priority', 'Group']]
@@ -153,6 +189,7 @@ export default function BoardPage() {
         onViewChange={setActiveView}
         onNewTask={handleNewTask}
         creatingTask={creatingTask || !currentUserId}
+        onNewProject={currentBoard && currentUserId ? () => setProjectDialogOpen(true) : undefined}
         onExport={handleExportCSV}
         onAutomations={() => setAutomationsOpen(true)}
         filters={activeFilters}
@@ -188,6 +225,9 @@ export default function BoardPage() {
               creationAssigneeId={isMyTasks ? currentUserId : null}
               filterMyProjects={isMyTasks}
               newTaskId={newTaskId}
+              selectedProjectIds={currentProjectNavigation?.projects?.map((project) => project.id)}
+              focusProjectId={currentProjectNavigation?.focusedId}
+              focusProjectRequestId={currentProjectNavigation}
             />
           )}
         </div>
@@ -211,6 +251,9 @@ export default function BoardPage() {
       )}
 
       <AutomationsPanel open={automationsOpen} onClose={() => setAutomationsOpen(false)} />
+      {projectDialogOpen && currentBoard && (
+        <NewProjectDialog key={currentBoard.id} onClose={() => setProjectDialogOpen(false)} onSelectProject={handleSelectProject} />
+      )}
     </div>
   )
 }

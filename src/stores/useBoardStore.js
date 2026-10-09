@@ -2,6 +2,10 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { randomGroupColor, loadStatusOptions, saveStatusOptionsToStorage } from '../lib/utils'
 import { isCompletedTaskGroup } from '../lib/taskGroups'
+import { normalizeProjectName } from '../lib/taskProjects'
+
+const pendingProjectActivations = new Map()
+const pendingToDoGroups = new Map()
 
 function loadAutomationsCache(boardId) {
   try { return JSON.parse(localStorage.getItem(`board-automations-${boardId}`) || '[]') } catch { return [] }
@@ -224,6 +228,106 @@ export const useBoardStore = create((set, get) => ({
     return data
   },
 
+  activateProjectForNewTask: async (projectId) => {
+    const initial = get()
+    const boardId = initial.currentBoard?.id
+    if (!boardId) throw new Error('Open a board before selecting a project.')
+    const source = initial.subGroups.find((project) => project.id === projectId && project.board_id === boardId)
+    if (!source || !initial.groups.some((group) => group.id === source.group_id && group.board_id === boardId)) {
+      throw new Error('This project is no longer available. Search and select it again.')
+    }
+    const projectName = typeof source.name === 'string' ? source.name.trim() : ''
+    const normalizedName = normalizeProjectName(projectName)
+    if (!normalizedName) throw new Error('This project needs a name before it can be selected.')
+
+    const readBoardState = () => {
+      const state = get()
+      if (state.currentBoard?.id !== boardId) throw new Error('The board changed. Open the original board and try again.')
+      return state
+    }
+    const findToDoGroup = (state) => state.groups.find((group) => (
+      group.board_id === boardId && normalizeProjectName(group.name) === 'to do'
+    ))
+    const findActiveProject = (state) => state.subGroups.find((project) => (
+      project.board_id === boardId
+      && normalizeProjectName(project.name) === normalizedName
+      && state.groups.some((group) => (
+        group.id === project.group_id && group.board_id === boardId && normalizeProjectName(group.name) === 'to do'
+      ))
+    ))
+    const existingProject = findActiveProject(initial)
+    if (existingProject) return existingProject
+
+    const activationKey = JSON.stringify([boardId, normalizedName])
+    const existingActivation = pendingProjectActivations.get(activationKey)
+    if (existingActivation) return existingActivation
+
+    const activation = (async () => {
+      let state = readBoardState()
+      let activeProject = findActiveProject(state)
+      if (activeProject) return activeProject
+      let group = findToDoGroup(state)
+      if (!group) {
+        let groupCreation = pendingToDoGroups.get(boardId)
+        if (!groupCreation) {
+          groupCreation = (async () => {
+            const beforeCreate = readBoardState()
+            const existingGroup = findToDoGroup(beforeCreate)
+            if (existingGroup) return existingGroup
+            const { data, error } = await supabase.from('groups')
+              .insert({ board_id: boardId, name: 'To Do', color: randomGroupColor(), position: beforeCreate.groups.filter((item) => item.board_id === boardId).length })
+              .select().single()
+            if (error) throw error
+            readBoardState()
+            if (!data?.id || data.board_id !== boardId || normalizeProjectName(data.name) !== 'to do') {
+              throw new Error('The To Do group could not be created. Please try again.')
+            }
+            set((current) => ({ groups: current.groups.some((item) => item.id === data.id) ? current.groups : [...current.groups, data] }))
+            return findToDoGroup(readBoardState())
+          })()
+          pendingToDoGroups.set(boardId, groupCreation)
+        }
+        try {
+          group = await groupCreation
+        } finally {
+          if (pendingToDoGroups.get(boardId) === groupCreation) pendingToDoGroups.delete(boardId)
+        }
+        state = readBoardState()
+        // A realtime event may have supplied the active counterpart while its
+        // group was being created, or another selection may have finished.
+        activeProject = findActiveProject(state)
+        if (activeProject) return activeProject
+      }
+
+      state = readBoardState()
+      if (!state.subGroups.some((project) => project.id === projectId && project.board_id === boardId && normalizeProjectName(project.name) === normalizedName)) {
+        throw new Error('The selected project changed. Search and select it again.')
+      }
+      group = findToDoGroup(state) || group
+      if (!group || !state.groups.some((item) => item.id === group.id && item.board_id === boardId)) {
+        throw new Error('The To Do group is no longer available. Please try again.')
+      }
+      activeProject = findActiveProject(state)
+      if (activeProject) return activeProject
+      const { data, error } = await supabase.from('sub_groups')
+        .insert({ board_id: boardId, group_id: group.id, name: projectName, position: state.subGroups.filter((project) => project.board_id === boardId && project.group_id === group.id).length })
+        .select().single()
+      if (error) throw error
+      readBoardState()
+      if (!data?.id || data.board_id !== boardId || data.group_id !== group.id || normalizeProjectName(data.name) !== normalizedName) {
+        throw new Error('The project could not be added to To Do. Please try again.')
+      }
+      set((current) => ({ subGroups: current.subGroups.some((project) => project.id === data.id) ? current.subGroups : [...current.subGroups, data] }))
+      return findActiveProject(readBoardState())
+    })()
+    pendingProjectActivations.set(activationKey, activation)
+    try {
+      return await activation
+    } finally {
+      if (pendingProjectActivations.get(activationKey) === activation) pendingProjectActivations.delete(activationKey)
+    }
+  },
+
   updateSubGroup: async (subGroupId, updates) => {
     await supabase.from('sub_groups').update(updates).eq('id', subGroupId)
     set((s) => ({
@@ -232,11 +336,40 @@ export const useBoardStore = create((set, get) => ({
   },
 
   deleteSubGroup: async (subGroupId) => {
-    await supabase.from('tasks').update({ sub_group_id: null }).eq('sub_group_id', subGroupId)
-    await supabase.from('sub_groups').delete().eq('id', subGroupId)
+    const { subGroups, tasks } = get()
+    const project = subGroups.find((sg) => sg.id === subGroupId)
+    if (!project) throw new Error('This project is no longer available. Refresh and try again.')
+    const projectTaskIds = tasks.filter((t) => (
+      t.board_id === project.board_id && t.sub_group_id === subGroupId
+    )).map((t) => t.id)
+    const { data: detachedTasks, error: detachError } = await supabase.from('tasks')
+      .update({ sub_group_id: null })
+      .eq('sub_group_id', subGroupId)
+      .eq('board_id', project.board_id)
+      .select('id, sub_group_id')
+    if (detachError) throw detachError
+    if (!Array.isArray(detachedTasks)) {
+      throw new Error('Project tasks could not be detached. Refresh and try again.')
+    }
+
+    const detachedIds = new Set(detachedTasks.filter((t) => t.sub_group_id === null).map((t) => t.id))
+    // Keep confirmed task changes even if project deletion fails, so retrying
+    // starts from the saved state without losing tasks or unrelated edits.
+    set((s) => ({ tasks: s.tasks.map((t) => (
+      t.board_id === project.board_id && t.sub_group_id === subGroupId && detachedIds.has(t.id)
+        ? { ...t, sub_group_id: null }
+        : t
+    )) }))
+    if (projectTaskIds.some((id) => !detachedIds.has(id))) {
+      throw new Error('Some project tasks could not be detached. Refresh and try again.')
+    }
+
+    const { data: deletedProject, error: deleteError } = await supabase.from('sub_groups')
+      .delete().eq('id', subGroupId).eq('board_id', project.board_id).select('id').single()
+    if (deleteError) throw deleteError
+    if (!deletedProject) throw new Error('The project could not be deleted. Refresh and try again.')
     set((s) => ({
-      subGroups: s.subGroups.filter((sg) => sg.id !== subGroupId),
-      tasks: s.tasks.map((t) => t.sub_group_id === subGroupId ? { ...t, sub_group_id: null } : t),
+      subGroups: s.subGroups.filter((sg) => sg.id !== subGroupId || sg.board_id !== project.board_id),
     }))
   },
 
@@ -289,7 +422,7 @@ export const useBoardStore = create((set, get) => ({
     let projectId = 'sub_group_id' in patch ? patch.sub_group_id : task.sub_group_id
     const sourceProject = subGroups.find((sg) => sg.id === projectId && sg.board_id === task.board_id)
     const matchesProject = (sg) => sourceProject && sg.board_id === task.board_id
-      && (sg.name || '').trim().toLowerCase() === (sourceProject.name || '').trim().toLowerCase()
+      && normalizeProjectName(sg.name) === normalizeProjectName(sourceProject.name)
 
     if (statusChanged && !('group_id' in patch)) {
       // Keep existing automation order, but never send unfinished work into

@@ -11,7 +11,7 @@ import Modal from '../ui/Modal'
 // Module-level so React never remounts it when TaskGroup re-renders (fixes rename losing focus)
 function SubGroupDropHeader({
   sg, sgTasks, sgCollapsed, groupColor, isVirtual,
-  onToggle, onDelete,
+  onToggle, onDelete, headerRef,
   editingSGId, editingSGName,
   onEditStart, onEditChange, onEditCommit, onEditCancel,
 }) {
@@ -29,7 +29,7 @@ function SubGroupDropHeader({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => { setNodeRef(node); if (headerRef) headerRef.current = node }}
       style={style}
       className={`flex items-center gap-1 pl-2 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a] group/sghdr transition-colors ${
         isTaskOver && !isDragging ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-50 dark:bg-[#1d1d1d]'
@@ -51,7 +51,7 @@ function SubGroupDropHeader({
         </button>
       )}
 
-      <button onClick={() => onToggle(sg.id)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
+      <button onClick={() => onToggle(sg.id)} aria-label={`${sgCollapsed ? 'Expand' : 'Collapse'} project ${sg.name}`} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition flex-shrink-0">
         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
           className={`transition-transform duration-150 ${sgCollapsed ? '-rotate-90' : ''}`}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -89,7 +89,8 @@ function SubGroupDropHeader({
         <button
           onClick={() => onDelete?.(sg.id)}
           className="opacity-0 group-hover/sghdr:opacity-100 transition-opacity p-0.5 rounded text-gray-400 hover:text-red-500 flex-shrink-0"
-          title="Delete section"
+          title="Delete project"
+          aria-label={`Delete project ${sg.name}`}
         >
           <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -117,7 +118,6 @@ export default function TaskGroup({
   onDeleteTask,
   onUpdateGroupName,
   onDeleteGroup,
-  onAddSubGroup,
   onUpdateSubGroup,
   onDeleteSubGroup,
   onOpenTask,
@@ -126,13 +126,15 @@ export default function TaskGroup({
   isVirtual = false,
   hideAddTask = false,
   focusTaskId = null,
+  focusProjectId = null,
+  focusProjectRequestId = null,
   showCompletedDate = false,
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
   const { user } = useAuthStore()
   const canEdit = !isVirtual && user?.email === SUPER_USER_EMAIL
   const storageKey = `group-collapsed-${group.id}`
-  const [collapsed,           setCollapsed]           = useState(() => !tasks.some((task) => task.id === focusTaskId) && localStorage.getItem(storageKey) === 'true')
+  const [collapsed,           setCollapsed]           = useState(() => !tasks.some((task) => task.id === focusTaskId) && !subGroups.some((project) => project.id === focusProjectId) && localStorage.getItem(storageKey) === 'true')
   const [editingName,         setEditingName]         = useState(false)
   const [nameValue,           setNameValue]           = useState(group.name)
   const [newTaskId,           setNewTaskId]           = useState(null)
@@ -147,13 +149,17 @@ export default function TaskGroup({
   const [colorPickerOpen,     setColorPickerOpen]     = useState(false)
   // Sub-group state
   const [collapsedSGs,        setCollapsedSGs]        = useState({})
-  const [addingSubGroup,      setAddingSubGroup]      = useState(false)
-  const [newSGName,           setNewSGName]           = useState('')
   const [editingSGId,         setEditingSGId]         = useState(null)
   const [editingSGName,       setEditingSGName]       = useState('')
+  const [deleteProject,       setDeleteProject]       = useState(null)
+  const [deletingProject,     setDeletingProject]     = useState(false)
+  const [deleteProjectError,  setDeleteProjectError]  = useState('')
+  const deletingProjectRef = useRef(false)
+  const focusedProjectRef = useRef(null)
   const contextMenuRef    = useRef(null)
   const colorPickerRef    = useRef(null)
   const [lastFocusTaskId, setLastFocusTaskId] = useState(focusTaskId)
+  const [lastProjectFocus, setLastProjectFocus] = useState({ id: focusProjectId, requestId: focusProjectRequestId })
 
   // Header creation happens outside this component. Reveal its row before paint,
   // including when this group or the target project was previously collapsed.
@@ -166,9 +172,21 @@ export default function TaskGroup({
     }
   }
 
+  if (focusProjectId !== lastProjectFocus.id || focusProjectRequestId !== lastProjectFocus.requestId) {
+    setLastProjectFocus({ id: focusProjectId, requestId: focusProjectRequestId })
+    if (subGroups.some((project) => project.id === focusProjectId)) {
+      setCollapsed(false)
+      setCollapsedSGs((previous) => ({ ...previous, [focusProjectId]: false }))
+    }
+  }
+
   useEffect(() => {
     localStorage.setItem(storageKey, String(collapsed))
   }, [collapsed, storageKey])
+
+  useEffect(() => {
+    if (!collapsed && focusProjectId) focusedProjectRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  }, [collapsed, focusProjectId, focusProjectRequestId])
 
   const visibleColumns = boardColumns.filter((c) => !c.hidden)
 
@@ -216,12 +234,34 @@ export default function TaskGroup({
 
   const toggleSG = (sgId) => setCollapsedSGs((prev) => ({ ...prev, [sgId]: !prev[sgId] }))
 
-  const handleAddSubGroup = async (e) => {
-    e.preventDefault()
-    if (hideAddTask || !newSGName.trim() || !onAddSubGroup) return
-    await onAddSubGroup(newSGName.trim())
-    setNewSGName('')
-    setAddingSubGroup(false)
+  const requestProjectDeletion = (projectId) => {
+    const project = subGroups.find((item) => item.id === projectId)
+    if (!project || !onDeleteSubGroup || deletingProjectRef.current) return
+    setDeleteProject(project)
+    setDeleteProjectError('')
+  }
+
+  const closeProjectDeletion = () => {
+    if (deletingProjectRef.current) return
+    setDeleteProject(null)
+    setDeleteProjectError('')
+  }
+
+  const handleDeleteProject = async (event) => {
+    event.preventDefault()
+    if (!deleteProject || !onDeleteSubGroup || deletingProjectRef.current) return
+    deletingProjectRef.current = true
+    setDeletingProject(true)
+    setDeleteProjectError('')
+    try {
+      await onDeleteSubGroup(deleteProject.id)
+      setDeleteProject(null)
+    } catch (error) {
+      setDeleteProjectError(`Could not delete the project. ${error?.message || 'Please try again.'}`)
+    } finally {
+      deletingProjectRef.current = false
+      setDeletingProject(false)
+    }
   }
 
   const commitSGName = async (sg) => {
@@ -264,7 +304,7 @@ export default function TaskGroup({
       {/* ── Group header ── */}
       <div className="flex items-stretch group/grphdr" style={{ borderLeft: `3px solid ${group.color}` }}>
         <div className="flex items-center gap-2 px-3 py-2 flex-1">
-          <button onClick={toggleCollapsed} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition">
+          <button onClick={toggleCollapsed} aria-label={`${collapsed ? 'Expand' : 'Collapse'} group ${group.name}`} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition">
             <svg
               width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
               className={`transition-transform duration-150 ${collapsed ? '-rotate-90' : ''}`}
@@ -384,10 +424,10 @@ export default function TaskGroup({
             <SortableContext items={subGroups.map((sg) => `sg-sort-${sg.id}`)} strategy={verticalListSortingStrategy}>
             {subGroups.map((sg) => {
               const sgTasks = tasks.filter((t) => t.sub_group_id === sg.id)
-              if (hideAddTask && sgTasks.length === 0) return null
+              if (hideAddTask && sgTasks.length === 0 && sg.id !== focusProjectId) return null
               const sgCollapsed = !!collapsedSGs[sg.id]
               return (
-                <div key={sg.id}>
+                <div key={sg.id} data-project-id={sg.id}>
                   {/* Sub-group header — droppable target */}
                   <SubGroupDropHeader
                     sg={sg}
@@ -396,7 +436,8 @@ export default function TaskGroup({
                     groupColor={group.color}
                     isVirtual={isVirtual}
                     onToggle={toggleSG}
-                    onDelete={onDeleteSubGroup}
+                    onDelete={requestProjectDeletion}
+                    headerRef={sg.id === focusProjectId ? focusedProjectRef : undefined}
                     editingSGId={editingSGId}
                     editingSGName={editingSGName}
                     onEditStart={(id, name) => { setEditingSGId(id); setEditingSGName(name) }}
@@ -444,38 +485,6 @@ export default function TaskGroup({
             </SortableContext>
           </SortableContext>
 
-          {/* Add sub-group input */}
-          {!isVirtual && !hideAddTask && addingSubGroup ? (
-            <form
-              onSubmit={handleAddSubGroup}
-              className="flex items-center gap-2 pl-6 pr-3 h-8 border-b border-border-color dark:border-[#2a2a2a]"
-              style={{ borderLeft: `3px solid ${group.color}` }}
-            >
-              <div className="w-2 h-2 rounded-sm flex-shrink-0 opacity-40" style={{ backgroundColor: group.color }} />
-              <input
-                autoFocus
-                value={newSGName}
-                onChange={(e) => setNewSGName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Escape') { setAddingSubGroup(false); setNewSGName('') } }}
-                placeholder="Project name…"
-                className="flex-1 text-xs bg-transparent outline-none border-b border-primary-blue text-gray-700 dark:text-gray-200 py-0.5"
-              />
-              <button type="submit" disabled={!newSGName.trim()} className="text-[10px] text-primary-blue font-medium disabled:opacity-40">Add</button>
-              <button type="button" onClick={() => { setAddingSubGroup(false); setNewSGName('') }} className="text-[10px] text-gray-400">Cancel</button>
-            </form>
-          ) : !isVirtual && !hideAddTask ? (
-            <div
-              className="flex items-center gap-2 pl-6 pr-3 h-7 hover:bg-gray-50 dark:hover:bg-[#1d1d1d] transition cursor-pointer group/addsg border-b border-border-color dark:border-[#2a2a2a]"
-              style={{ borderLeft: `3px solid ${group.color}` }}
-              onClick={() => setAddingSubGroup(true)}
-            >
-              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="text-gray-400 group-hover/addsg:text-gray-600 dark:text-gray-500 dark:group-hover/addsg:text-gray-300 transition flex-shrink-0">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-              </svg>
-              <span className="text-[11px] text-gray-400 group-hover/addsg:text-gray-600 dark:text-gray-500 dark:group-hover/addsg:text-gray-300 transition">+ Add Project</span>
-            </div>
-          ) : null}
-
           {/* Add task to group (ungrouped) */}
           {!isVirtual && !hideAddTask && (
             <div
@@ -499,6 +508,34 @@ export default function TaskGroup({
           </div>
         </div>
       )}
+
+      <Modal open={!!deleteProject} onClose={closeProjectDeletion} title="Delete project" ariaDescribedBy={`delete-project-description-${group.id}`}>
+        <form onSubmit={handleDeleteProject}>
+          <p id={`delete-project-description-${group.id}`} className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+            Delete project <span className="font-semibold">“{deleteProject?.name}”</span>?
+            {' '}This permanently removes the project. Its tasks will be kept in their current groups without a project.
+          </p>
+          {deleteProjectError && <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-4">{deleteProjectError}</p>}
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              autoFocus
+              disabled={deletingProject}
+              onClick={closeProjectDeletion}
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-[#333] dark:text-gray-300 dark:hover:bg-[#3a3a3a] rounded-lg transition disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={deletingProject}
+              className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition disabled:opacity-50"
+            >
+              {deletingProject ? 'Deleting…' : 'Delete project'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* ── Delete Group Confirmation ── */}
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Delete group">
@@ -662,7 +699,7 @@ function ColumnHeaders({
   )
 
   return (
-    <div className="flex items-stretch bg-white dark:bg-[#1e1e1e] border-b border-t border-border-color dark:border-[#333]">
+    <div className="sticky top-0 z-20 flex items-stretch bg-white dark:bg-[#1e1e1e] border-b border-t border-border-color dark:border-[#333]">
       {/* color-bar stub + drag/checkbox stub — must match TaskRow exactly */}
       <div className="w-0.5 flex-shrink-0" />
       <div className="w-10 flex-shrink-0" />

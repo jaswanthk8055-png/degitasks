@@ -59,7 +59,7 @@ Run `npm test` for regression checks only. The dropdown visual fixture is availa
 
 ## Task links and accessible editing
 
-Opening Task Details adds `?task=<task-id>` to its board URL. **Copy task link** copies a link that opens the same task after refresh or sign-in. Browser Back/Forward restores task selection; unavailable or deleted tasks show a message instead of stale details. Existing notification links continue to work.
+Opening a task adds `?task=<task-id>` to its board URL. **Copy task link** in Task Details copies a link that opens the same task after refresh or sign-in. Browser Back/Forward restores task selection; unavailable or deleted tasks show a message instead of stale details. Existing notification links continue to work.
 
 Task status, priority, assignee, date, title, custom-field and delete controls have descriptive accessible names and keyboard focus. Open choice menus with Enter, Space or an arrow key; navigate them with arrows/Home/End and close with Escape. Escape cancels a title/date edit or closes its menu before closing Task Details. Delete confirmations keep focus inside the dialog and preserve the task if deletion fails.
 
@@ -67,7 +67,11 @@ Rows expose `data-task-id`, `data-board-id` and `data-save-state` for browser au
 
 ## My Tasks creation and empty-task cleanup
 
-Tasks created using **New Task**, **Add task**, or **Add task to this project** in My Tasks are assigned to the current user in the initial insert. Their row appears immediately and is ready to name. My Tasks shows projects containing tasks assigned to you. A new empty project you create stays visible in the current session while you add its first task. **Add Project** remains available in active groups, including groups with no tasks assigned to you. Main Table creation continues to leave the assignee blank.
+Tasks created using **New Task**, **Add task**, or **Add task to this project** in My Tasks are assigned to the current user in the initial insert. Their row appears immediately and is ready to name. Clicking an existing task's name opens Task Details, where its name can be edited. My Tasks shows projects containing tasks assigned to you, plus projects you create or explicitly select during the current session. Main Table creation continues to leave the assignee blank.
+
+Use **Add Project** beside **New Task** in the header to search existing project names as you type, including partial matches and projects hidden by My Tasks. The list shows each name once, combining its active and completed entries (ignoring case and extra whitespace). Selecting a name opens its **To Do** entry, reusing it if present or creating it while preserving the project's completed history. If necessary, a To Do group is created. Creating a new project requires a unique name on the current board and lets you choose an active group. If no active group exists, a Tasks group is created. Deleting a project requires confirmation and preserves its tasks in their current groups without a project.
+
+Empty project rows are hidden in both Main Table and My Tasks. A project you create or select stays visible while you add its first task. Once it has tasks, completing or moving its last task hides the empty row again; its completed tasks remain under the completed project.
 
 Groups named **Completed Tasks** or **Completed** have no task/project creation controls in either view. The header's **New Task** uses the first active group, creating a **Tasks** group if none exists.
 
@@ -75,7 +79,9 @@ Use the **Move to project** arrow beside a task's name, or the **Project** field
 
 Status, priority and assignee dropdowns open above their trigger when space below is insufficient. Long lists scroll inside the menu so all choices remain reachable.
 
-The nightly cleanup requires one separate Supabase migration: `supabase/cleanup-empty-tasks.sql`. It installs a daily midnight India-time job, with a 24-hour untouched grace period, and keeps tasks containing entered information. Projects/groups, tasks with children, and child tasks with a parent are retained. Assignment alone does not protect an empty task: manual, automatic, multiple-assignee and unassigned tasks follow the same checks. Assignment changes restart the 24-hour grace period; other recorded activity still protects the task. See [the cleanup installation and dry-run guide](supabase/cleanup-empty-tasks.md) for full rules and rollout steps. The frontend build/deployment alone does not activate this database job. Apply only this new migration to the existing database; do not replay historical schema scripts.
+The base nightly cleanup is installed by `supabase/cleanup-empty-tasks.sql`. It runs at midnight India time, with a 24-hour untouched grace period, and preserves tasks containing entered information, parents with children, and child tasks with a parent. Assignment alone does not protect an empty task; assignment changes restart the grace period. See [the task cleanup guide](supabase/cleanup-empty-tasks.md) for full rules.
+
+To also remove projects with no task references, apply **`supabase/cleanup-empty-projects.sql` after the base cleanup migration**. It extends the same midnight job to clean tasks first and then empty projects. New projects receive a 24-hour grace period; legacy empty projects without timestamps are eligible at the first midnight. Any remaining task, including a completed or child task, protects its project. Groups and boards are retained. The migration validates the task-to-project foreign key before enabling cleanup and does not delete anything immediately. See [the project cleanup installation and dry-run guide](supabase/cleanup-empty-projects.md). These local scripts and frontend changes do not install the job in the hosted database; do not replay historical schema scripts or rerun the base cleanup migration after the extension.
 
 ## Completed Tasks and My Tasks filters
 
@@ -109,7 +115,7 @@ Existing team members should sign in instead. Signup creates records in the conf
 | Auto workspace + board on signup | ✅ |
 | Dark sidebar (Monday.com style) | ✅ |
 | Board table view | ✅ |
-| Inline task title editing | ✅ |
+| Task details from task name; rename in details | ✅ |
 | Status pill with color-coded dropdown | ✅ |
 | Priority pill with color-coded dropdown | ✅ |
 | Assignee picker with avatar | ✅ |

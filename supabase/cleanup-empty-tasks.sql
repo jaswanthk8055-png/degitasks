@@ -4,7 +4,8 @@
 -- The single named job runs daily at 00:00 Asia/Kolkata (18:30 UTC).
 -- A task must have been untouched for at least 24 hours before it can qualify.
 -- Assignment alone does not protect an otherwise empty task.
--- Projects/sub_groups, groups and boards are never deleted by this job.
+-- This base cleanup deletes only tasks. Install cleanup-empty-projects.sql
+-- afterward to extend the scheduled job to empty projects; groups/boards stay.
 -- See cleanup-empty-tasks.md for the dry run, rollout and regression tests.
 
 begin;

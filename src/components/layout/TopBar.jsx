@@ -19,6 +19,7 @@ export default function TopBar({
   onViewChange,
   onNewTask,
   creatingTask = false,
+  onNewProject,
   onExport,
   onAutomations,
   filters,
@@ -264,6 +265,17 @@ export default function TopBar({
           <NotificationBell />
 
           {/* New Task */}
+          {onNewProject && (
+            <button
+              onClick={onNewProject}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 border border-primary-blue text-primary-blue text-xs font-medium rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
+            >
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+              Add Project
+            </button>
+          )}
           <button
             onClick={onNewTask}
             disabled={creatingTask}

@@ -7,7 +7,7 @@ const FORMATS = [
   { command: 'strikeThrough', label: 'S',  title: 'Strikethrough',      className: 'line-through' },
 ]
 
-export default function RichTextEditor({ value, onChange, placeholder, readOnly = false }) {
+export default function RichTextEditor({ value, onChange, placeholder, readOnly = false, label = 'Description' }) {
   const editorRef    = useRef(null)
   const lastEmitted  = useRef(null)
   const [active, setActive] = useState({ bold: false, italic: false, underline: false, strikeThrough: false })
@@ -41,6 +41,7 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly 
   const execFormat = (command) => {
     document.execCommand(command, false, null)
     editorRef.current?.focus()
+    handleInput()
   }
 
   const handleInput = () => {
@@ -52,7 +53,7 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly 
     onChange?.(html)
   }
 
-  const btnBase = 'w-7 h-7 flex items-center justify-center rounded transition text-sm select-none'
+  const btnBase = 'w-7 h-7 flex items-center justify-center rounded transition text-sm select-none focus-visible:ring-2 focus-visible:ring-primary-blue'
   const btnActive = 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
   const btnIdle   = 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-[#3a3a3a] dark:hover:text-gray-200'
 
@@ -66,7 +67,10 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly 
               key={command}
               type="button"
               title={title}
-              onMouseDown={(e) => { e.preventDefault(); execFormat(command) }}
+              aria-label={title}
+              aria-pressed={active[command]}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execFormat(command)}
               className={`${btnBase} ${active[command] ? btnActive : btnIdle}`}
             >
               <span className={className}>{label}</span>
@@ -79,6 +83,11 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly 
       <div
         ref={editorRef}
         contentEditable={!readOnly}
+        role="textbox"
+        aria-label={label}
+        aria-multiline="true"
+        aria-readonly={readOnly}
+        tabIndex={0}
         suppressContentEditableWarning
         onInput={handleInput}
         data-placeholder={placeholder}

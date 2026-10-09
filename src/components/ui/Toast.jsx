@@ -9,6 +9,9 @@ export default function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+          aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
           className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl text-sm font-medium text-white min-w-[240px] max-w-[360px] animate-toast-in ${
             toast.type === 'error'
               ? 'bg-status-red'
@@ -20,6 +23,7 @@ export default function ToastContainer() {
           <span className="flex-1">{toast.message}</span>
           <button
             onClick={() => removeToast(toast.id)}
+            aria-label="Dismiss notification"
             className="text-white/70 hover:text-white transition flex-shrink-0"
           >
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

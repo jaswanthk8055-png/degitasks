@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { getDropdownPosition } from '../../lib/dropdownPosition'
 
-export default function Dropdown({ open, onClose, children, className = '', anchorRef = null }) {
+export default function Dropdown({ open, onClose, children, className = '', anchorRef = null, id, role, 'aria-label': ariaLabel, initialFocus = null }) {
   const ref = useRef(null)
 
   // Measure before paint so a menu near the last row opens above its trigger.
@@ -48,6 +48,42 @@ export default function Dropdown({ open, onClose, children, className = '', anch
     }
   }, [open, anchorRef])
 
+  useEffect(() => {
+    if (!open || !initialFocus || !ref.current) return
+    const items = ref.current.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex="0"]')
+    const item = initialFocus === 'last' ? items[items.length - 1] : items[0]
+    item?.focus({ preventScroll: true })
+  }, [open, initialFocus])
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      // Portals still bubble through their React parent (including task panels).
+      event.stopPropagation()
+      onClose()
+      anchorRef?.current?.focus({ preventScroll: true })
+      return
+    }
+    if (role !== 'menu') return
+    if (event.key === 'Tab') {
+      onClose()
+      // Return to the trigger before the browser performs its normal Tab move.
+      anchorRef?.current?.focus({ preventScroll: true })
+      return
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const items = Array.from(ref.current.querySelectorAll('[role^="menuitem"]:not(:disabled):not([aria-disabled="true"])'))
+    if (!items.length) return
+    event.preventDefault()
+    event.stopPropagation()
+    const current = items.indexOf(document.activeElement)
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? items.length - 1
+      : event.key === 'ArrowDown' ? (current + 1) % items.length
+      : (current <= 0 ? items.length : current) - 1
+    items[next].focus()
+  }
+
   // Scrolling a long menu must keep it open so every option is reachable.
   useEffect(() => {
     if (!open) return
@@ -62,8 +98,9 @@ export default function Dropdown({ open, onClose, children, className = '', anch
     }
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
+        e.preventDefault()
         onClose()
-        anchorRef?.current?.focus()
+        anchorRef?.current?.focus({ preventScroll: true })
       }
     }
     document.addEventListener('mousedown', onDown)
@@ -81,6 +118,10 @@ export default function Dropdown({ open, onClose, children, className = '', anch
   const content = (
     <div
       ref={ref}
+      id={id}
+      role={role}
+      aria-label={ariaLabel}
+      onKeyDown={handleKeyDown}
       style={
         anchorRef
           ? {
@@ -103,9 +144,10 @@ export default function Dropdown({ open, onClose, children, className = '', anch
 export function DropdownItem({ onClick, children, className = '' }) {
   return (
     <button
+      type="button"
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={`w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 flex items-center gap-2 transition-colors ${className}`}
+      className={`w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-blue flex items-center gap-2 transition-colors ${className}`}
     >
       {children}
     </button>

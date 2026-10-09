@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useLocation } from 'react-router-dom'
+import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { useBoard } from '../hooks/useBoard'
 import { useBoardStore } from '../stores/useBoardStore'
 import { useAuthStore } from '../stores/useAuthStore'
@@ -17,7 +17,8 @@ const EMPTY_FILTERS = { assigneeIds: [], statuses: [], priorities: [], dueThisWe
 export default function BoardPage() {
   const { boardId } = useParams()
   const location = useLocation()
-  const { loading } = useBoard(boardId)
+  const navigate = useNavigate()
+  const { loading, error: boardError } = useBoard(boardId)
   const { groups, tasks, createTask, createGroup, currentBoard, updateTask, profiles } =
     useBoardStore()
   const { profile, user } = useAuthStore()
@@ -25,7 +26,6 @@ export default function BoardPage() {
   const { addToast } = useToastStore()
 
   const [activeView,       setActiveView]       = useState(profile?.default_page || 'Main Table')
-  const [selection,        setSelection]        = useState({ locationKey: location.key, task: undefined })
   const [filters,          setFilters]          = useState(EMPTY_FILTERS)
   const [myTasksFilters,   setMyTasksFilters]   = useState(EMPTY_FILTERS)
   const [filterOpen,       setFilterOpen]       = useState(false)
@@ -44,15 +44,32 @@ export default function BoardPage() {
     return () => { document.title = 'DegiTasks' }
   }, [currentBoard?.name])
 
-  // Navigation can request a task before the board's tasks have loaded.
-  // An explicit selection (including closing the panel) overrides that request.
-  const explicitSelection = selection.locationKey === location.key ? selection.task : undefined
-  const selectedTask = explicitSelection !== undefined
-    ? explicitSelection
-    : !loading && tasks.find((t) => t.id === location.state?.openTaskId)
-  const liveSelectedTask = selectedTask
-    ? tasks.find((t) => t.id === selectedTask.id) || selectedTask
+  const taskParams = new URLSearchParams(location.search)
+  const hasTaskParam = taskParams.has('task')
+  const legacyTaskId = location.state?.openTaskId
+  const requestedTaskId = hasTaskParam ? taskParams.get('task') : legacyTaskId
+  const hasTaskRequest = hasTaskParam || Boolean(legacyTaskId)
+  const validTaskRequest = typeof requestedTaskId === 'string' && requestedTaskId.trim() !== ''
+    && taskParams.getAll('task').length <= 1
+  const boardReady = !loading && currentBoard?.id === boardId
+  // Resolve from live board data only: deletion or a move must never leave a
+  // stale, editable copy in the details panel. The URL also restores history.
+  const liveSelectedTask = boardReady && validTaskRequest
+    ? tasks.find((task) => task.id === requestedTaskId && task.board_id === boardId)
     : null
+  const taskUnavailable = hasTaskRequest && !loading && !liveSelectedTask
+    && (!currentBoard || currentBoard.id === boardId)
+
+  // Existing notifications use location state. Canonicalize them into a
+  // shareable URL and consume the state so closing cannot reopen the task.
+  useEffect(() => {
+    if (!legacyTaskId) return
+    const params = new URLSearchParams(location.search)
+    if (!params.has('task')) params.set('task', legacyTaskId)
+    const state = { ...location.state }
+    delete state.openTaskId
+    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true, state })
+  }, [legacyTaskId, location.pathname, location.search, location.hash, location.state, navigate])
 
   const handleNewTask = async () => {
     if (!currentBoard || !currentUserId || creatingTask) return
@@ -70,8 +87,22 @@ export default function BoardPage() {
     }
   }
 
-  const handleOpenTask = (task) => setSelection({ locationKey: location.key, task })
-  const handleClosePanel = () => setSelection({ locationKey: location.key, task: null })
+  const handleOpenTask = (task) => {
+    if (!boardReady || task.board_id !== boardId) return
+    const params = new URLSearchParams(location.search)
+    params.set('task', task.id)
+    if (params.toString() === new URLSearchParams(location.search).toString()) return
+    const state = { ...location.state }
+    delete state.openTaskId
+    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { state })
+  }
+  const handleClosePanel = () => {
+    const params = new URLSearchParams(location.search)
+    params.delete('task')
+    const state = { ...location.state }
+    delete state.openTaskId
+    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { state })
+  }
 
   const handleExportCSV = () => {
     if (!currentBoard || !tasks.length) return
@@ -107,6 +138,14 @@ export default function BoardPage() {
     )
   }
 
+  if (boardError) {
+    return (
+      <div role="alert" className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-100">
+        Could not load this board. Refresh the page to try again.
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden dark:bg-[#1a1a1a]">
       <TopBar
@@ -123,6 +162,15 @@ export default function BoardPage() {
         groupBy={activeGroupBy}
         onGroupByChange={isMyTasks ? setMyTasksGroupBy : setGroupBy}
       />
+
+      {taskUnavailable && (
+        <div role="alert" className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+          <p>This task is unavailable on this board. It may have been deleted, moved, or you may not have access.</p>
+          <button type="button" onClick={handleClosePanel} className="shrink-0 rounded px-2 py-1 font-medium underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            Dismiss task message
+          </button>
+        </div>
+      )}
 
       {(activeView === 'Main Table' || activeView === 'My Tasks') && (
         <div className="flex-1 overflow-hidden flex flex-col">

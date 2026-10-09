@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/useAuthStore'
+import { loginDestination } from '../../lib/authRedirect'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -9,6 +10,7 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const signIn = useAuthStore((s) => s.signIn)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -16,12 +18,7 @@ export default function LoginForm() {
     setLoading(true)
     try {
       await signIn(email, password)
-      // If opened as a Teams auth popup, redirect to the auth-end page which calls notifySuccess()
-      if (new URLSearchParams(window.location.search).get('teams_popup') === 'true') {
-        navigate('/teams-auth-success')
-        return
-      }
-      navigate('/')
+      navigate(loginDestination(location), { replace: true })
     } catch (err) {
       setError(err.message || 'Invalid email or password')
     } finally {

@@ -409,8 +409,14 @@ export const useBoardStore = create((set, get) => ({
   },
 
   deleteTask: async (taskId) => {
-    await supabase.from('tasks').delete().eq('id', taskId)
-    set((s) => ({ tasks: s.tasks.filter((t) => t.id !== taskId) }))
+    const task = get().tasks.find((candidate) => candidate.id === taskId)
+    if (!task) throw new Error('This task is no longer available. Refresh and try again.')
+    const { data, error } = await supabase.from('tasks')
+      .delete().eq('id', taskId).eq('board_id', task.board_id).select('id').single()
+    if (error) throw error
+    if (data?.id !== taskId) throw new Error('The task could not be deleted. Refresh and try again.')
+    set((s) => ({ tasks: s.tasks.filter((candidate) => candidate.id !== taskId || candidate.board_id !== task.board_id) }))
+    return data
   },
 
   // ─── Board Columns ────────────────────────────────────────────────
@@ -446,9 +452,10 @@ export const useBoardStore = create((set, get) => ({
 
   // ─── Column Values ────────────────────────────────────────────────
   updateColumnValue: async (taskId, columnId, value) => {
-    await supabase
+    const { error } = await supabase
       .from('task_column_values')
       .upsert({ task_id: taskId, column_id: columnId, value })
+    if (error) throw error
     set((s) => ({
       taskColumnValues: {
         ...s.taskColumnValues,

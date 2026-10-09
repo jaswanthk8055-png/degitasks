@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { supabase } from '../../lib/supabase'
@@ -11,6 +11,7 @@ export default function AppLayout() {
   const { user, loading } = useAuthStore()
   const { fetchBoards, createBoard } = useBoardStore()
   const navigate = useNavigate()
+  const location = useLocation()
   const [workspace, setWorkspace] = useState(null)
   const [workspaceMembers, setWorkspaceMembers] = useState([])
   const [loadedUserId, setLoadedUserId] = useState(null)
@@ -32,8 +33,10 @@ export default function AppLayout() {
   }, [])
 
   useEffect(() => {
-    if (!loading && !user) navigate('/login')
-  }, [user, loading, navigate])
+    if (!loading && !user) {
+      navigate('/login', { replace: true, state: { returnTo: `${location.pathname}${location.search}${location.hash}` } })
+    }
+  }, [user, loading, navigate, location.pathname, location.search, location.hash])
 
   const fetchWorkspaceMembers = useCallback(async (workspaceId) => {
     const { data } = await supabase

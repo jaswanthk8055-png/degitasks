@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useId } from 'react'
 import { STATUS_COLORS } from '../../lib/utils'
 import { useBoardStore } from '../../stores/useBoardStore'
 import { useAuthStore, SUPER_USER_EMAIL } from '../../stores/useAuthStore'
@@ -6,12 +6,15 @@ import { useToastStore } from '../../stores/useToastStore'
 import Dropdown from '../ui/Dropdown'
 import Modal from '../ui/Modal'
 
-export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
+export default function StatusPill({ status, statusColor, taskId, taskTitle, onUpdate }) {
   const [open, setOpen] = useState(false)
+  const [initialFocus, setInitialFocus] = useState(null)
   const [managing, setManaging] = useState(false)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const btnRef = useRef(null)
+  const menuId = useId()
+  const taskLabel = taskTitle ? ` for "${taskTitle}"` : ''
 
   const { statusOptions, currentBoard, updateStatusOptions } = useBoardStore()
   const { user } = useAuthStore()
@@ -24,6 +27,7 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
     savingRef.current = true
     setSaving(true)
     setOpen(false)
+    btnRef.current?.focus({ preventScroll: true })
     try {
       await onUpdate(taskId, { status: option.label, status_color: option.color })
     } catch (error) {
@@ -40,22 +44,47 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
     <div className="relative w-full">
       <button
         ref={btnRef}
-        disabled={saving}
+        type="button"
+        aria-label={`Edit status${taskLabel}: ${status || 'Not Started'}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-disabled={saving}
         aria-busy={saving}
-        onClick={() => setOpen((p) => !p)}
-        className="w-full h-6 px-2 rounded text-[11px] font-semibold text-white transition hover:opacity-85 focus:outline-none truncate"
+        onClick={(event) => {
+          if (savingRef.current) return
+          setInitialFocus(event.detail === 0 ? 'first' : null)
+          setOpen((p) => !p)
+        }}
+        onKeyDown={(event) => {
+          if (open && event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
+            setOpen(false)
+            return
+          }
+          if (savingRef.current || !['ArrowDown', 'ArrowUp'].includes(event.key)) return
+          event.preventDefault()
+          setInitialFocus(event.key === 'ArrowUp' ? 'last' : 'first')
+          setOpen(true)
+        }}
+        className="w-full h-6 px-2 rounded text-[11px] font-semibold text-white transition hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-blue truncate"
         style={{ backgroundColor: color }}
       >
         {status || 'Not Started'}
       </button>
 
-      <Dropdown open={open} onClose={() => setOpen(false)} className="w-48" anchorRef={btnRef}>
+      <Dropdown id={menuId} role="menu" aria-label={`Status${taskLabel}`} initialFocus={initialFocus} open={open} onClose={() => setOpen(false)} className="w-48" anchorRef={btnRef}>
         {options.map((opt) => (
           <button
             key={opt.label}
+            type="button"
+            role="menuitemradio"
+            aria-checked={opt.label === (status || 'Not Started')}
+            tabIndex={-1}
             onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
             onClick={() => handleSelect(opt)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 text-sm text-gray-700 dark:text-gray-300 transition"
+            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-blue text-sm text-gray-700 dark:text-gray-300 transition"
           >
             <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: opt.color }} />
             {opt.label}
@@ -66,9 +95,12 @@ export default function StatusPill({ status, statusColor, taskId, onUpdate }) {
           <>
             <div className="my-1 border-t border-gray-100 dark:border-[#333]" />
             <button
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { setOpen(false); setManaging(true) }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-primary-blue hover:bg-gray-50 dark:hover:bg-white/5 transition"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-400 hover:text-primary-blue hover:bg-gray-50 dark:hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-blue transition"
             >
               <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

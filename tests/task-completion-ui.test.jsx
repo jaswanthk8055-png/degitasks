@@ -63,12 +63,12 @@ function seedAndRender(status) {
 }
 
 async function changeStatusInDetails(previous, next) {
-  fireEvent.click(screen.getByTitle('Open details'))
+  fireEvent.click(screen.getByRole('button', { name: `Open details for "${TASK_TITLE}"`, exact: true }))
   const panel = screen.getByText('Task Details').parentElement.parentElement
   // Exercise actual portal interaction after the panel's outside-click handler exists.
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)) })
-  fireEvent.click(within(panel).getByRole('button', { name: previous, exact: true }))
-  const option = screen.getByRole('button', { name: next, exact: true })
+  fireEvent.click(within(panel).getByRole('button', { name: `Edit status for "${TASK_TITLE}": ${previous}`, exact: true }))
+  const option = screen.getByRole('menuitemradio', { name: next, exact: true })
   fireEvent.mouseDown(option)
   expect(screen.getByText('Task Details')).toBeTruthy()
   fireEvent.click(option)
@@ -128,10 +128,10 @@ describe('completion changes through task details', () => {
       payload: { status: 'In Review', status_color: '#0086c0', completed_date: null, group_id: 'active-group', sub_group_id: 'active-project' },
       filters: [{ column: 'id', value: TASK_ID }, { column: 'board_id', value: BOARD_ID }],
     }])
-    expect(within(panel).getByRole('button', { name: 'In Review', exact: true })).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: `Edit status for "${TASK_TITLE}": In Review`, exact: true })).toBeTruthy()
     const activeSection = screen.getByText('To Do').closest('.mb-2')
     expect(within(activeSection).getByText(TASK_TITLE)).toBeTruthy()
-    expect(within(activeSection).queryByRole('button', { name: 'Edit completed date' })).toBeNull()
+    expect(within(activeSection).queryByRole('button', { name: /^Edit completed date/ })).toBeNull()
     expect(screen.queryByText('Completed Tasks')).toBeNull()
   })
 
@@ -149,10 +149,10 @@ describe('completion changes through task details', () => {
       payload: { status: 'Done', status_color: '#00c875', completed_date: today, group_id: 'completed-group', sub_group_id: 'completed-project' },
       filters: [{ column: 'id', value: TASK_ID }, { column: 'board_id', value: BOARD_ID }],
     }])
-    expect(within(panel).getByRole('button', { name: 'Done', exact: true })).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: `Edit status for "${TASK_TITLE}": Done`, exact: true })).toBeTruthy()
     const completedSection = screen.getByText('Completed Tasks').closest('.mb-2')
     expect(within(completedSection).getByText(TASK_TITLE)).toBeTruthy()
-    expect(within(completedSection).getByRole('button', { name: 'Edit completed date' })).toBeTruthy()
+    expect(within(completedSection).getByRole('button', { name: /^Edit completed date/ })).toBeTruthy()
   })
 
   it('keeps the previous status and completion date when saving fails, then allows retry', async () => {
@@ -163,10 +163,10 @@ describe('completion changes through task details', () => {
     expect(useBoardStore.getState().tasks[0]).toMatchObject({
       status: 'Done', completed_date: '2025-01-02', group_id: 'completed-group', sub_group_id: 'completed-project',
     })
-    const status = within(panel).getByRole('button', { name: 'Done', exact: true })
-    expect(status.disabled).toBe(false)
+    const status = within(panel).getByRole('button', { name: `Edit status for "${TASK_TITLE}": Done`, exact: true })
+    expect(status.getAttribute('aria-disabled')).toBe('false')
     fireEvent.click(status)
-    fireEvent.click(screen.getByRole('button', { name: 'In Review', exact: true }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'In Review', exact: true }))
     await waitFor(() => expect(useBoardStore.getState().tasks[0].status).toBe('In Review'))
     expect(writes).toHaveLength(2)
   })
@@ -177,14 +177,14 @@ describe('completion changes through task details', () => {
     responseHandlers.push((data) => new Promise((resolve) => { resolveSave = () => resolve({ data, error: null }) }))
     const panel = await changeStatusInDetails('Done', 'In Review')
     await waitFor(() => expect(writes).toHaveLength(1))
-    const status = within(panel).getByRole('button', { name: 'Done', exact: true })
-    expect(status.disabled).toBe(true)
+    const status = within(panel).getByRole('button', { name: `Edit status for "${TASK_TITLE}": Done`, exact: true })
+    expect(status.getAttribute('aria-disabled')).toBe('true')
     expect(status.getAttribute('aria-busy')).toBe('true')
     fireEvent.click(status)
-    expect(screen.queryByRole('button', { name: 'In Review', exact: true })).toBeNull()
+    expect(screen.queryByRole('menuitemradio', { name: 'In Review', exact: true })).toBeNull()
     expect(useBoardStore.getState().tasks[0]).toMatchObject({ status: 'Done', completed_date: '2025-01-02', group_id: 'completed-group' })
     await act(async () => resolveSave())
-    expect(within(panel).getByRole('button', { name: 'In Review', exact: true }).disabled).toBe(false)
+    expect(within(panel).getByRole('button', { name: `Edit status for "${TASK_TITLE}": In Review`, exact: true }).getAttribute('aria-disabled')).toBe('false')
     expect(useBoardStore.getState().tasks[0]).toMatchObject({ status: 'In Review', completed_date: null, group_id: 'active-group' })
     expect(writes).toHaveLength(1)
   })

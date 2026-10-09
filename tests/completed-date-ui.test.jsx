@@ -55,23 +55,23 @@ describe('Completed Date column', () => {
   it('is opt-in so active task tables retain their existing columns', () => {
     renderGroup()
     expect(screen.queryByText('Completed Date')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Edit completed date' })).toBeNull()
-    expect(screen.getAllByRole('button', { name: 'Edit due date' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /^Edit completed date/ })).toBeNull()
+    expect(screen.getAllByRole('button', { name: /^Edit due date/ })).toHaveLength(2)
   })
 
   it('renders the editable date for standalone and project tasks without overdue styling', () => {
     const { onUpdateTask } = renderGroup({ showCompletedDate: true })
     expect(screen.getByText('Completed Date')).toBeTruthy()
-    const editors = screen.getAllByRole('button', { name: 'Edit completed date' })
+    const editors = screen.getAllByRole('button', { name: /^Edit completed date/ })
     expect(editors.map((editor) => editor.textContent)).toEqual(['May 9', 'May 10'])
     for (const editor of editors) expect(editor.className).not.toContain('text-status-red')
 
     fireEvent.click(editors[1])
-    const input = screen.getByLabelText('Completed date')
+    const input = screen.getByLabelText(/^Completed date/)
     expect(input.value).toBe('2020-05-10')
     fireEvent.change(input, { target: { value: '2020-05-07' } })
     expect(onUpdateTask).toHaveBeenCalledExactlyOnceWith('project-task', { completed_date: '2020-05-07' })
-    expect(screen.queryByLabelText('Completed date')).toBeNull()
+    expect(screen.queryByLabelText(/^Completed date/)).toBeNull()
 
     const dateCell = editors[0].parentElement
     fireEvent.click(within(dateCell).getByTitle('Clear date'))
@@ -82,7 +82,7 @@ describe('Completed Date column', () => {
     const { onWidthChange } = renderGroup({ showCompletedDate: true, colWidths: { ...COL_DEFAULTS, completedDate: 180 } })
     const header = screen.getByText('Completed Date')
     expect(header.style.width).toBe('180px')
-    for (const editor of screen.getAllByRole('button', { name: 'Edit completed date' })) {
+    for (const editor of screen.getAllByRole('button', { name: /^Edit completed date/ })) {
       expect(editor.parentElement.parentElement.style.width).toBe('180px')
     }
     fireEvent.mouseDown(header.lastElementChild, { button: 0, clientX: 100 })
@@ -93,10 +93,10 @@ describe('Completed Date column', () => {
 
   it('preserves editing and overdue highlighting for due dates', () => {
     const { onUpdateTask } = renderGroup({ tasks: [{ ...tasks[0], due_date: '2020-05-01' }], showCompletedDate: true })
-    const dueDate = screen.getByRole('button', { name: 'Edit due date' })
+    const dueDate = screen.getByRole('button', { name: /^Edit due date/ })
     expect(dueDate.className).toContain('text-status-red')
     fireEvent.click(dueDate)
-    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2020-05-02' } })
+    fireEvent.change(screen.getByLabelText(/^Due date/), { target: { value: '2020-05-02' } })
     expect(onUpdateTask).toHaveBeenCalledExactlyOnceWith('loose-task', { due_date: '2020-05-02' })
   })
 
@@ -107,17 +107,17 @@ describe('Completed Date column', () => {
     expect(within(completedSection).getByText('Completed standalone task')).toBeTruthy()
     expect(within(completedSection).getByText('Completed project task')).toBeTruthy()
     expect(within(completedSection).queryByText('Needs more work')).toBeNull()
-    expect(within(completedSection).getAllByRole('button', { name: 'Edit completed date' })).toHaveLength(2)
+    expect(within(completedSection).getAllByRole('button', { name: /^Edit completed date/ })).toHaveLength(2)
     const activeSection = screen.getByText('Active Tasks').closest('.mb-2')
     expect(within(activeSection).getByText('Needs more work')).toBeTruthy()
     expect(within(activeSection).getByText(status)).toBeTruthy()
-    expect(within(activeSection).queryByRole('button', { name: 'Edit completed date' })).toBeNull()
+    expect(within(activeSection).queryByRole('button', { name: /^Edit completed date/ })).toBeNull()
   })
 
   it('keeps completed project dates visible when grouped by status', () => {
     render(<BoardTable groupBy="status" />)
     expect(screen.getByText('Completed Date')).toBeTruthy()
     expect(screen.getByText('Completed project task')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Edit completed date' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^Edit completed date/ })).toHaveLength(2)
   })
 })

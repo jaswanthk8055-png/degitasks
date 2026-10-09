@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import Modal from '../ui/Modal'
 import {
   DndContext,
@@ -310,15 +310,37 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
   }
 
   const [taskToDelete, setTaskToDelete] = useState(null)
+  const [deletingTask, setDeletingTask] = useState(false)
+  const [deleteTaskError, setDeleteTaskError] = useState('')
+  const deleteTaskPending = useRef(false)
 
   const handleDeleteTask = (taskId) => {
+    if (deleteTaskPending.current) return
+    setDeleteTaskError('')
     setTaskToDelete(taskId)
   }
 
-  const confirmDeleteTask = async () => {
-    await deleteTask(taskToDelete)
-    addToast('Task deleted', 'error')
+  const closeTaskDeletion = () => {
+    if (deleteTaskPending.current) return
     setTaskToDelete(null)
+    setDeleteTaskError('')
+  }
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete || deleteTaskPending.current) return
+    deleteTaskPending.current = true
+    setDeletingTask(true)
+    setDeleteTaskError('')
+    try {
+      await deleteTask(taskToDelete)
+      addToast('Task deleted', 'success')
+      setTaskToDelete(null)
+    } catch (error) {
+      setDeleteTaskError(error.message || 'Could not delete task. Please try again.')
+    } finally {
+      deleteTaskPending.current = false
+      setDeletingTask(false)
+    }
   }
 
   const handleDeleteGroup = async (groupId) => {
@@ -470,26 +492,30 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       </div>
 
       {/* Delete Task Confirmation */}
-      <Modal open={!!taskToDelete} onClose={() => setTaskToDelete(null)} title="Delete task">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
+      <Modal open={!!taskToDelete} onClose={closeTaskDeletion} title="Delete task" busy={deletingTask} ariaDescribedBy="delete-task-description">
+        <p id="delete-task-description" className="text-sm text-gray-600 dark:text-gray-400 mb-5">
           Are you sure you want to delete{' '}
           <span className="font-semibold">
             {tasks.find((t) => t.id === taskToDelete)?.title || 'this task'}
           </span>
           ? This action cannot be undone.
         </p>
+        {deleteTaskError && <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-4">{deleteTaskError}</p>}
         <div className="flex gap-2 justify-end">
           <button
-            onClick={() => setTaskToDelete(null)}
-            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-[#333] dark:text-gray-300 dark:hover:bg-[#3a3a3a] rounded-lg transition"
+            onClick={closeTaskDeletion}
+            disabled={deletingTask}
+            className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-[#333] dark:text-gray-300 dark:hover:bg-[#3a3a3a] rounded-lg transition disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={confirmDeleteTask}
-            className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition"
+            disabled={deletingTask}
+            aria-busy={deletingTask}
+            className="px-4 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-lg transition disabled:opacity-50"
           >
-            Delete task
+            {deletingTask ? 'Deleting…' : 'Delete task'}
           </button>
         </div>
       </Modal>

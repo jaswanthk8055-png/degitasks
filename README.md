@@ -57,6 +57,14 @@ This runs ESLint, the regression tests, and creates the production frontend in `
 
 Run `npm test` for regression checks only. The dropdown visual fixture is available at `/tests/dropdown-demo.html` while the Vite dev server is running; it contains no team data and is not included in the production build.
 
+## Task links and accessible editing
+
+Opening Task Details adds `?task=<task-id>` to its board URL. **Copy task link** copies a link that opens the same task after refresh or sign-in. Browser Back/Forward restores task selection; unavailable or deleted tasks show a message instead of stale details. Existing notification links continue to work.
+
+Task status, priority, assignee, date, title, custom-field and delete controls have descriptive accessible names and keyboard focus. Open choice menus with Enter, Space or an arrow key; navigate them with arrows/Home/End and close with Escape. Escape cancels a title/date edit or closes its menu before closing Task Details. Delete confirmations keep focus inside the dialog and preserve the task if deletion fails.
+
+Rows expose `data-task-id`, `data-board-id` and `data-save-state` for browser automation. Task Details also exposes the task ID and save state (`idle`, `unsaved`, `saving`, `saved`, or `error`). Use the visible fields and accessible controls to edit; wait for confirmed save feedback. Description edits autosave, retain failed drafts for retry while the panel is open, and flush their pending debounce when the panel closes. These improvements use existing user permissions and require no new database migration or agent credentials.
+
 ## My Tasks creation and empty-task cleanup
 
 Tasks created using **New Task**, **Add task**, or **Add task to this project** in My Tasks are assigned to the current user in the initial insert. Their row appears immediately and is ready to name. My Tasks shows projects containing tasks assigned to you. A new empty project you create stays visible in the current session while you add its first task. **Add Project** remains available in active groups, including groups with no tasks assigned to you. Main Table creation continues to leave the assignee blank.

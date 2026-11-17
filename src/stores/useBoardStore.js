@@ -8,6 +8,7 @@ const pendingProjectActivations = new Map()
 const pendingToDoGroups = new Map()
 let boardRequest = 0
 let boardsRequest = 0
+let boardStateGeneration = 0
 
 const emptyBoardData = { currentBoard: null, groups: [], tasks: [], subGroups: [], profiles: [], memberProfiles: [], boardColumns: [], taskColumnValues: {}, statusOptions: [], automations: [], loading: false }
 
@@ -47,6 +48,7 @@ export const useBoardStore = create((set, get) => ({
   },
 
   clearBoardState: () => {
+    boardStateGeneration++
     boardRequest++
     boardsRequest++
     set({ ...emptyBoardData, boards: [], workspaceId: null })
@@ -79,8 +81,34 @@ export const useBoardStore = create((set, get) => ({
   },
 
   deleteBoard: async (boardId) => {
-    await supabase.from('boards').delete().eq('id', boardId)
-    set((s) => ({ boards: s.boards.filter((b) => b.id !== boardId) }))
+    const { boards, currentBoard, workspaceId } = get()
+    const board = boards.find((item) => item.id === boardId)
+      || (currentBoard?.id === boardId ? currentBoard : null)
+    if (!board?.workspace_id || (workspaceId && board.workspace_id !== workspaceId)) {
+      throw new Error('This board is no longer available. Refresh the page and try again.')
+    }
+    const generation = boardStateGeneration
+    const { data, error } = await supabase
+      .from('boards')
+      .delete()
+      .eq('id', boardId)
+      .eq('workspace_id', board.workspace_id)
+      .select('id')
+      .single()
+    if (error?.code === '42501') throw new Error('You do not have permission to delete this board.', { cause: error })
+    if (error && error.code !== 'PGRST116') throw error
+    if (error || !data || data.id !== boardId) {
+      throw new Error('The board could not be deleted. You may not have permission, or it may no longer be available.', { cause: error })
+    }
+    // A late response must not alter a replacement account/workspace view.
+    if (generation !== boardStateGeneration || get().workspaceId !== workspaceId) return data
+    boardsRequest++
+    if (get().currentBoard?.id === boardId) boardRequest++
+    set((s) => ({
+      ...(s.currentBoard?.id === boardId ? emptyBoardData : {}),
+      boards: s.boards.filter((item) => item.id !== boardId),
+    }))
+    return data
   },
 
   updateBoardName: async (boardId, name) => {

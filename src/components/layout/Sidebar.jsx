@@ -21,7 +21,7 @@ export default function Sidebar({
 }) {
   const { boardId } = useParams()
   const location = useLocation()
-  const { profile, signOut } = useAuthStore()
+  const { user, profile, signOut } = useAuthStore()
   const { boards, createBoard, updateBoard, deleteBoard } = useBoardStore()
   const { dark, toggle: toggleTheme } = useThemeStore()
   const navigate = useNavigate()
@@ -75,6 +75,9 @@ export default function Sidebar({
   const [settingsName, setSettingsName] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteBoardError, setDeleteBoardError] = useState('')
+  const deletePendingRef = useRef(false)
+  const canDeleteSettingsBoard = !!user?.id && settingsBoard?.created_by === user.id
 
   const [inviteModal, setInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -125,6 +128,14 @@ export default function Sidebar({
     setSettingsBoard(board)
     setSettingsName(board.name)
     setConfirmDelete(false)
+    setDeleteBoardError('')
+  }
+
+  const closeBoardSettings = () => {
+    if (savingSettings || deletePendingRef.current) return
+    setSettingsBoard(null)
+    setConfirmDelete(false)
+    setDeleteBoardError('')
   }
 
   const handleSaveSettings = async () => {
@@ -139,13 +150,23 @@ export default function Sidebar({
   }
 
   const handleDeleteBoard = async () => {
-    if (!settingsBoard) return
+    if (!settingsBoard || savingSettings || deletePendingRef.current) return
+    if (!canDeleteSettingsBoard) {
+      setDeleteBoardError('Only the board creator can delete this board.')
+      return
+    }
+    deletePendingRef.current = true
     setSavingSettings(true)
+    setDeleteBoardError('')
     try {
       await deleteBoard(settingsBoard.id)
       setSettingsBoard(null)
+      setConfirmDelete(false)
       if (boardId === settingsBoard.id) navigate('/')
+    } catch (error) {
+      setDeleteBoardError(error?.message || 'Could not delete the board. Please try again.')
     } finally {
+      deletePendingRef.current = false
       setSavingSettings(false)
     }
   }
@@ -552,27 +573,31 @@ export default function Sidebar({
       </Modal>
 
       {/* ── Board Settings Modal ── */}
-      <Modal open={!!settingsBoard} onClose={() => setSettingsBoard(null)} title={`Board: ${settingsBoard?.name}`}>
+      <Modal open={!!settingsBoard} onClose={closeBoardSettings} busy={savingSettings} title={`Board: ${settingsBoard?.name}`}>
         <div className="space-y-4">
-          {!confirmDelete ? (
+          {!confirmDelete || !canDeleteSettingsBoard ? (
             <>
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Board name</label>
                 <input
                   autoFocus
                   type="text"
+                  aria-label="Board name"
                   value={settingsName}
                   onChange={(e) => setSettingsName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSettings() }}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue dark:bg-[#252525] dark:border-[#444] dark:text-white"
                 />
               </div>
-              <div className="flex items-center justify-between pt-1">
-                <button onClick={() => setConfirmDelete(true)} className="text-sm text-red-500 hover:text-red-600 hover:underline transition">
-                  Delete board
-                </button>
+              {!canDeleteSettingsBoard && <p className="text-xs text-gray-500 dark:text-gray-400">Only the board creator can delete this board.</p>}
+              <div className={`flex items-center ${canDeleteSettingsBoard ? 'justify-between' : 'justify-end'} pt-1`}>
+                {canDeleteSettingsBoard && (
+                  <button disabled={savingSettings} onClick={() => { setDeleteBoardError(''); setConfirmDelete(true) }} className="text-sm text-red-500 hover:text-red-600 hover:underline transition disabled:opacity-50">
+                    Delete board
+                  </button>
+                )}
                 <div className="flex gap-2">
-                  <button onClick={() => setSettingsBoard(null)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                  <button disabled={savingSettings} onClick={closeBoardSettings} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50">Cancel</button>
                   <button
                     onClick={handleSaveSettings}
                     disabled={savingSettings || !settingsName.trim()}
@@ -589,7 +614,7 @@ export default function Sidebar({
                 Delete <strong>{settingsBoard?.name}</strong>? All tasks and groups will be permanently removed.
               </p>
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setConfirmDelete(false)} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
+                <button disabled={savingSettings} onClick={() => { setConfirmDelete(false); setDeleteBoardError('') }} className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50">Cancel</button>
                 <button
                   onClick={handleDeleteBoard}
                   disabled={savingSettings}
@@ -600,6 +625,7 @@ export default function Sidebar({
               </div>
             </div>
           )}
+          {deleteBoardError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{deleteBoardError}</p>}
         </div>
       </Modal>
 

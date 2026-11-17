@@ -18,7 +18,7 @@ export default function StatusPill({ status, statusColor, taskId, taskTitle, onU
 
   const { statusOptions, currentBoard, updateStatusOptions } = useBoardStore()
   const { user } = useAuthStore()
-  const canEdit = user?.email === SUPER_USER_EMAIL
+  const canEdit = user?.email === SUPER_USER_EMAIL || (currentBoard?.visibility === 'private' && currentBoard.created_by === user?.id)
 
   const options = statusOptions.length > 0 ? statusOptions : []
 

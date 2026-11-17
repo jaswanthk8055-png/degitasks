@@ -132,7 +132,7 @@ export default function TaskGroup({
 }) {
   const { boardColumns, createBoardColumn, updateBoardColumn, deleteBoardColumn, updateGroup, currentBoard } = useBoardStore()
   const { user } = useAuthStore()
-  const canEdit = !isVirtual && user?.email === SUPER_USER_EMAIL
+  const canEdit = !isVirtual && (user?.email === SUPER_USER_EMAIL || (currentBoard?.visibility === 'private' && currentBoard.created_by === user?.id))
   const storageKey = `group-collapsed-${group.id}`
   const [collapsed,           setCollapsed]           = useState(() => !tasks.some((task) => task.id === focusTaskId) && !subGroups.some((project) => project.id === focusProjectId) && localStorage.getItem(storageKey) === 'true')
   const [editingName,         setEditingName]         = useState(false)

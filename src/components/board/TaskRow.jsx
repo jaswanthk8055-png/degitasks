@@ -27,9 +27,9 @@ export default function TaskRow({
   const titleButtonRef = useRef(null)
   const restoreTitleFocus = useRef(false)
   const [savingTitle, setSavingTitle] = useState(false)
-  const { taskColumnValues, updateColumnValue, memberProfiles } = useBoardStore()
+  const { taskColumnValues, updateColumnValue, memberProfiles, currentBoard } = useBoardStore()
   const { user } = useAuthStore()
-  const canEdit = user?.email === SUPER_USER_EMAIL
+  const canEdit = user?.email === SUPER_USER_EMAIL || (currentBoard?.visibility === 'private' && currentBoard.created_by === user?.id)
   const feedback = useSaveFeedback()
   const taskTitle = task.title || 'Untitled task'
   const handleUpdate = (taskId, updates) => feedback.save(() => onUpdate(taskId, updates))

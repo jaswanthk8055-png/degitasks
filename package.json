@@ -11,11 +11,12 @@
     "build": "vite build",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",
-    "test": "npm run test:unit && npm run test:ui && npm run test:cleanup && npm run test:completion",
+    "test": "npm run test:unit && npm run test:ui && npm run test:cleanup && npm run test:completion && npm run test:privacy",
     "test:unit": "node --test tests/*.test.js",
     "test:ui": "vitest run",
     "test:cleanup": "node supabase/tests/cleanup-empty-tasks.test.mjs && node supabase/tests/cleanup-empty-projects.test.mjs",
     "test:completion": "node supabase/tests/completed-tasks.test.mjs",
+    "test:privacy": "node supabase/tests/board-privacy.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -57,6 +57,17 @@ This runs ESLint, the regression tests, and creates the production frontend in `
 
 Run `npm test` for regression checks only. The dropdown visual fixture is available at `/tests/dropdown-demo.html` while the Vite dev server is running; it contains no team data and is not included in the production build.
 
+## Private boards
+
+When creating a board, choose **Public** for workspace access or **Private**
+for a board visible only to its creator. Existing boards stay public. Private
+tasks can only be assigned to their owner and are excluded from Teams reminders,
+which may post to a shared channel. The choice is fixed when the board is created.
+
+Before using private boards, follow [the private-board deployment guide](supabase/board-privacy.md).
+The database migration, updated active `send-daily-reminders` function, and frontend must all be
+deployed and verified; local changes alone do not protect live data.
+
 ## Task links and accessible editing
 
 Opening a task adds `?task=<task-id>` to its board URL. **Copy task link** in Task Details copies a link that opens the same task after refresh or sign-in. Browser Back/Forward restores task selection; unavailable or deleted tasks show a message instead of stale details. Existing notification links continue to work.
@@ -170,25 +181,28 @@ DegiTasks is a static frontend (Vercel) backed by Supabase, with a few integrati
 
 | Service | Role | Where it's configured |
 |---|---|---|
-| **Supabase** | Auth, Postgres DB, Row Level Security, Realtime subscriptions, and 3 Edge Functions | Project dashboard → Settings → API. Schema lives in `supabase/schema.sql` (plus incremental migrations: `phase2.sql`, `phase3.sql`, `phase4.sql`, `multi-assignee.sql`, `add_*.sql`, `fix_rls_recursion.sql`) |
+| **Supabase** | Auth, Postgres DB, Row Level Security, Realtime subscriptions, and 2 deployed Edge Functions | Project dashboard → Settings → API. Schema lives in `supabase/schema.sql` (plus incremental migrations: `phase2.sql`, `phase3.sql`, `phase4.sql`, `multi-assignee.sql`, `add_*.sql`, `fix_rls_recursion.sql`) |
 | **Vercel** | Hosting/deployment, serverless function (`api/send-email.js`), Teams-specific CSP headers | `vercel.json`; env vars set in the Vercel project dashboard |
 | **Resend** | Transactional email (workspace invites, daily task reminders) | `RESEND_API_KEY` env var, used by `api/send-email.js` and the `send-invite-email` / `send-daily-reminders` Edge Functions |
-| **Microsoft Teams / Azure AD** | Teams tab app, auth popup, and daily reminder webhook | `teams-app/manifest.json` (Teams app registration), `TEAMS_WEBHOOK_URL` used by the `teams-reminder` Edge Function |
+| **Microsoft Teams / Azure AD** | Teams tab app, auth popup, and daily reminder webhooks | `teams-app/manifest.json` (Teams app registration); `send-daily-reminders` uses each user's `profiles.teams_webhook_url` and notification preference |
 | **Domain** | Production URL | `degitasks.degitrans.com` / `degitasks.com` |
 
 ### Supabase Edge Functions (`supabase/functions/`)
-- `send-invite-email` — sends workspace invite emails via Resend when a member is invited.
-- `send-daily-reminders` — cron-triggered (see `supabase/daily-reminders-cron.sql`), emails users their due/overdue tasks daily at 8:30 AM IST.
-- `teams-reminder` — posts daily reminders into Microsoft Teams via `TEAMS_WEBHOOK_URL` for users who've opted in.
+
+Production inventory verified on 18 November 2026: only `send-invite-email` and `send-daily-reminders` are deployed. The daily cron targets `send-daily-reminders`; no standalone `teams-reminder` function or cron is deployed.
+
+- `send-invite-email` — deployed; sends workspace invite emails via Resend when a member is invited.
+- `send-daily-reminders` — deployed and cron-triggered (see `supabase/daily-reminders-cron.sql`); sends due/overdue reminders daily at 8:30 AM IST through email, personal Teams webhooks, or both according to each user's notification preference. Private tasks can be emailed only to their assigned owner and are omitted from Teams cards. The deployed privacy update was verified against this source, with gateway JWT verification still enabled.
+- `teams-reminder` — optional standalone shared-channel briefing retained in source only. If explicitly enabled, it uses `TEAMS_WEBHOOK_URL`, includes only public-board tasks, and does not consult individual notification preferences. It is not required for the active daily email/Teams path.
 
 ### Environment variables & secrets
 - **Frontend (`.env`)**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — safe to expose client-side, see `.env.example`.
 - **Vercel project env vars**: `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` — required by `api/send-email.js`.
-- **Supabase Edge Function secrets** (set via `supabase secrets set` or the dashboard, not in this repo): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `FROM_EMAIL`, `APP_URL`, `TEAMS_WEBHOOK_URL`.
+- **Supabase Edge Function secrets** (set via `supabase secrets set` or the dashboard, not in this repo): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `FROM_EMAIL`, `APP_URL`. `TEAMS_WEBHOOK_URL` is required only if the optional standalone `teams-reminder` is enabled; active daily Teams delivery uses the user's saved webhook URL.
 - None of the service-role/API-key secrets are committed to the repo — they must be pulled from the Vercel and Supabase dashboards directly by anyone with project access.
 
 ### Deployment
 - The documented production workflow is push to `main` → Vercel auto-deploys. Confirm the Git connection and production branch in the existing Vercel project before your first release from this PC. Run `npm run check` before pushing.
 - Database changes: apply only the new, reviewed SQL for that feature, in dependency order. No migration runner is configured; do not rerun historical files or rely on alphabetical filename order.
-- Edge Function changes: deploy via `supabase functions deploy <name>` (requires Supabase CLI + project link).
+- Edge Function changes: deploy changed active functions via `supabase functions deploy <name>` (requires Supabase CLI + project link), preserving their authentication settings. Do not deploy or schedule the retained standalone `teams-reminder` unless intentionally enabling that separate integration.
 - Teams app: packaged via `package-teams.bat` into `degitask-teams.zip`, then uploaded/updated in the Teams admin center or sideloaded for testing.

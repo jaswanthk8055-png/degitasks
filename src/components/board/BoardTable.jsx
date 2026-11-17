@@ -97,7 +97,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
     currentBoard, logActivity,
   } = useBoardStore()
   const { profile, user } = useAuthStore()
-  const canEdit = user?.email === SUPER_USER_EMAIL
+  const canEdit = user?.email === SUPER_USER_EMAIL || (currentBoard?.visibility === 'private' && currentBoard.created_by === user?.id)
   const { addToast } = useToastStore()
 
   const [activeTask, setActiveTask]   = useState(null)
@@ -160,7 +160,7 @@ export default function BoardTable({ filters, onOpenTask, groupBy = 'group', hid
       const allNames = nextIds.map((id) => profiles.find((p) => p.id === id)?.full_name).filter(Boolean)
       logActivity({ taskId, userId: profile?.id, action: 'task_assigned', meta: { assignee_name: allNames.join(', ') || 'Unassigned' } })
 
-      for (const assigneeId of newlyAdded) {
+      for (const assigneeId of currentBoard?.visibility === 'private' ? [] : newlyAdded) {
         if (assigneeId === profile?.id) continue
         supabase.from('notifications').insert({
           user_id: assigneeId,

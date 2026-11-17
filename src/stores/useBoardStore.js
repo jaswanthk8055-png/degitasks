@@ -6,6 +6,10 @@ import { normalizeProjectName } from '../lib/taskProjects'
 
 const pendingProjectActivations = new Map()
 const pendingToDoGroups = new Map()
+let boardRequest = 0
+let boardsRequest = 0
+
+const emptyBoardData = { currentBoard: null, groups: [], tasks: [], subGroups: [], profiles: [], memberProfiles: [], boardColumns: [], taskColumnValues: {}, statusOptions: [], automations: [], loading: false }
 
 function loadAutomationsCache(boardId) {
   try { return JSON.parse(localStorage.getItem(`board-automations-${boardId}`) || '[]') } catch { return [] }
@@ -32,21 +36,28 @@ export const useBoardStore = create((set, get) => ({
 
   // ─── Boards ───────────────────────────────────────────────────────
   fetchBoards: async (workspaceId) => {
+    const request = ++boardsRequest
     set({ workspaceId })
     const { data, error } = await supabase
       .from('boards')
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('created_at')
-    if (!error) set({ boards: data || [] })
+    if (request === boardsRequest && !error) set({ boards: data || [] })
+  },
+
+  clearBoardState: () => {
+    boardRequest++
+    boardsRequest++
+    set({ ...emptyBoardData, boards: [], workspaceId: null })
   },
 
   setCurrentBoard: (board) => set({ currentBoard: board }),
 
-  createBoard: async (workspaceId, userId, name, icon = '📋', color = '#0073ea') => {
+  createBoard: async (workspaceId, userId, name, icon = '📋', color = '#0073ea', visibility = 'public') => {
     const { data, error } = await supabase
       .from('boards')
-      .insert({ workspace_id: workspaceId, name, icon, color, created_by: userId })
+      .insert({ workspace_id: workspaceId, name, icon, color, created_by: userId, visibility })
       .select()
       .single()
     if (error) throw error
@@ -106,9 +117,15 @@ export const useBoardStore = create((set, get) => ({
 
   // ─── Groups ───────────────────────────────────────────────────────
   fetchBoardData: async (boardId, silent = false) => {
+    const request = ++boardRequest
     if (!silent) set({ loading: true })
 
     const boardRes = await supabase.from('boards').select('*').eq('id', boardId).single()
+    if (request !== boardRequest) return
+    if (boardRes.error || !boardRes.data) {
+      set(emptyBoardData)
+      throw boardRes.error || new Error('Board not found or unavailable')
+    }
     const workspaceId = boardRes.data?.workspace_id
 
     const [groupsRes, tasksRes, membersRes, columnsRes, subGroupsRes] = await Promise.all([
@@ -121,7 +138,9 @@ export const useBoardStore = create((set, get) => ({
 
     // Collect user IDs from workspace_members (may be limited by RLS)
     // + all assignee IDs from tasks (always visible) to ensure we load every assignee's profile
-    const memberIds = membersRes.data?.map((m) => m.user_id).filter(Boolean) ?? []
+    const memberIds = boardRes.data.visibility === 'private'
+      ? [boardRes.data.created_by].filter(Boolean)
+      : membersRes.data?.map((m) => m.user_id).filter(Boolean) ?? []
     const singleAssignees = tasksRes.data?.map((t) => t.assignee_id).filter(Boolean) ?? []
     const multiAssignees = (tasksRes.data ?? []).flatMap((t) => t.assignee_ids ?? []).filter(Boolean)
     const allUserIds = [...new Set([...memberIds, ...singleAssignees, ...multiAssignees])]
@@ -160,6 +179,7 @@ export const useBoardStore = create((set, get) => ({
       ? dbAutomations
       : loadAutomationsCache(boardId)
 
+    if (request !== boardRequest) return
     set({
       currentBoard: boardRes.data,
       groups: groupsRes.data || [],

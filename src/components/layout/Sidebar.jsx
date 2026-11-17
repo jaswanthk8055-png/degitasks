@@ -67,6 +67,8 @@ export default function Sidebar({
   const [newBoardName, setNewBoardName] = useState('')
   const [newBoardIcon, setNewBoardIcon] = useState('📋')
   const [newBoardColor, setNewBoardColor] = useState('#0073ea')
+  const [newBoardVisibility, setNewBoardVisibility] = useState('public')
+  const [createBoardError, setCreateBoardError] = useState('')
   const [creating, setCreating] = useState(false)
 
   const [settingsBoard, setSettingsBoard] = useState(null)
@@ -100,13 +102,18 @@ export default function Sidebar({
     e.preventDefault()
     if (!newBoardName.trim() || !workspace) return
     setCreating(true)
+    setCreateBoardError('')
     try {
-      const board = await createBoard(workspace.id, profile.id, newBoardName.trim(), newBoardIcon, newBoardColor)
+      const board = await createBoard(workspace.id, profile.id, newBoardName.trim(), newBoardIcon, newBoardColor, newBoardVisibility)
       setNewBoardModal(false)
       setNewBoardName('')
       setNewBoardIcon('📋')
       setNewBoardColor('#0073ea')
+      setNewBoardVisibility('public')
       navigate(`/board/${board.id}`)
+    } catch (error) {
+      console.error('[DegiTasks] Failed to create board:', error)
+      setCreateBoardError('Could not create the board. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -362,7 +369,7 @@ export default function Sidebar({
               <div key={board.id} className="group/board relative">
                 <Link
                   to={`/board/${board.id}`}
-                  title={board.name}
+                  title={board.visibility === 'private' ? `${board.name} (Private)` : board.name}
                   onClick={handleNavClick}
                   className={`flex items-center gap-2.5 px-2 py-2 rounded-lg transition text-sm ${collapsed ? 'justify-center' : 'pr-8'} ${
                     boardId === board.id
@@ -374,6 +381,7 @@ export default function Sidebar({
                     {board.icon || '📋'}
                   </span>
                   {!collapsed && <span className="truncate">{board.name}</span>}
+                  {!collapsed && board.visibility === 'private' && <span className="text-xs text-gray-400" aria-label="Private board">🔒</span>}
                 </Link>
                 {!collapsed && (
                   <button
@@ -478,6 +486,19 @@ export default function Sidebar({
             placeholder="Board name"
             className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-blue focus:border-transparent dark:bg-[#252525] dark:border-[#444] dark:text-white"
           />
+          <fieldset>
+            <legend className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Visibility</legend>
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
+                <input type="radio" name="board-visibility" value="public" checked={newBoardVisibility === 'public'} onChange={(e) => setNewBoardVisibility(e.target.value)} className="mt-1" />
+                <span><span className="font-medium">Public</span><span className="block text-xs text-gray-500">Everyone in this workspace can see this board.</span></span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200 cursor-pointer">
+                <input type="radio" name="board-visibility" value="private" checked={newBoardVisibility === 'private'} onChange={(e) => setNewBoardVisibility(e.target.value)} className="mt-1" />
+                <span><span className="font-medium">Private</span><span className="block text-xs text-gray-500">Only you can see this board and its tasks.</span></span>
+              </label>
+            </div>
+          </fieldset>
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Icon</p>
             <div className="flex flex-wrap gap-2">
@@ -511,6 +532,7 @@ export default function Sidebar({
               ))}
             </div>
           </div>
+          {createBoardError && <p role="alert" className="text-sm text-red-500">{createBoardError}</p>}
           <div className="flex gap-2 justify-end pt-1">
             <button
               type="button"

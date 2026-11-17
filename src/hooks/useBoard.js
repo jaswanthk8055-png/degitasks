@@ -34,7 +34,7 @@ export function useBoard(boardId) {
   useEffect(() => {
     if (!boardId) return
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') fetchBoardData(boardId, true)
+      if (document.visibilityState === 'visible') fetchBoardData(boardId, true).catch(() => {})
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
@@ -44,7 +44,7 @@ export function useBoard(boardId) {
   useEffect(() => {
     if (!boardId) return
     const id = setInterval(() => {
-      if (!realtimeRef.current) fetchBoardData(boardId, true)
+      if (!realtimeRef.current) fetchBoardData(boardId, true).catch(() => {})
     }, POLL_INTERVAL_MS)
     return () => clearInterval(id)
   }, [boardId, fetchBoardData])

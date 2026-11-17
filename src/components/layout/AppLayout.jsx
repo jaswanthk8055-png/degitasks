@@ -9,13 +9,14 @@ import CommandPalette from '../ui/CommandPalette'
 
 export default function AppLayout() {
   const { user, loading } = useAuthStore()
-  const { fetchBoards, createBoard } = useBoardStore()
+  const userId = user?.id
+  const { fetchBoards, createBoard, clearBoardState } = useBoardStore()
   const navigate = useNavigate()
   const location = useLocation()
   const [workspace, setWorkspace] = useState(null)
   const [workspaceMembers, setWorkspaceMembers] = useState([])
   const [loadedUserId, setLoadedUserId] = useState(null)
-  const workspaceLoading = loadedUserId !== user?.id
+  const workspaceLoading = loadedUserId !== userId
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const isTeamsMode = new URLSearchParams(window.location.search).get('teams') === 'true'
@@ -49,11 +50,17 @@ export default function AppLayout() {
   }, [])
 
   useEffect(() => {
-    if (!user) return
+    // Auth refreshes replace the user object without changing accounts. Only
+    // reset board data when the account ID changes, or the open board is lost.
+    clearBoardState()
+    if (!userId) return
     let cancelled = false
+    let activated = false
     const activateWorkspace = (ws) => {
       if (cancelled) return
+      activated = true
       setWorkspace(ws)
+      setWorkspaceMembers([])
       fetchBoards(ws.id)
       fetchWorkspaceMembers(ws.id)
     }
@@ -75,10 +82,11 @@ export default function AppLayout() {
           return
         }
 
-        const displayName = useAuthStore.getState().profile?.full_name || user.email?.split('@')[0] || 'My'
+        const auth = useAuthStore.getState()
+        const displayName = auth.profile?.full_name || auth.user?.email?.split('@')[0] || 'My'
         const { data: newWs, error: createErr } = await supabase
           .from('workspaces')
-          .insert({ name: `${displayName}'s Workspace`, owner_id: user.id })
+          .insert({ name: `${displayName}'s Workspace`, owner_id: userId })
           .select()
           .single()
 
@@ -86,18 +94,21 @@ export default function AppLayout() {
 
         await supabase
           .from('workspace_members')
-          .insert({ workspace_id: newWs.id, user_id: user.id, role: 'owner' })
-        await createBoard(newWs.id, user.id, 'My First Board')
+          .insert({ workspace_id: newWs.id, user_id: userId, role: 'owner' })
+        await createBoard(newWs.id, userId, 'My First Board')
         activateWorkspace(newWs)
       } finally {
-        if (!cancelled) setLoadedUserId(user.id)
+        if (!cancelled) {
+          if (!activated) { setWorkspace(null); setWorkspaceMembers([]) }
+          setLoadedUserId(userId)
+        }
       }
     }
     fetchWorkspace()
     return () => { cancelled = true }
-  }, [user, fetchBoards, createBoard, fetchWorkspaceMembers])
+  }, [userId, fetchBoards, createBoard, clearBoardState, fetchWorkspaceMembers])
 
-  if (loading) {
+  if (loading || (user && workspaceLoading)) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-[#111]">
         <div className="flex flex-col items-center gap-3">

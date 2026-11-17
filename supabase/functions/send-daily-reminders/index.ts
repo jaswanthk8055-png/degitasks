@@ -21,7 +21,7 @@ Deno.serve(async () => {
     .from('tasks')
     .select(`
       id, title, status, priority, due_date,
-      board:boards(id, name),
+      board:boards(id, name, visibility, created_by),
       assignee:profiles!tasks_assignee_id_fkey(id, full_name),
       group:groups(name)
     `)
@@ -59,6 +59,9 @@ Deno.serve(async () => {
   for (const task of tasks) {
     const uid = task.assignee?.id
     if (!uid) continue
+    // Service-role queries bypass RLS. Only the owner may receive a private
+    // task by email, even if inconsistent assignment data exists.
+    if (!task.board || (task.board.visibility === 'private' && task.board.created_by !== uid)) continue
     if (!byUser.has(uid)) byUser.set(uid, { name: task.assignee.full_name ?? 'there', dueToday: [], overdue: [] })
     const bucket = byUser.get(uid)!
     if (task.due_date === today) bucket.dueToday.push(task)
@@ -146,7 +149,11 @@ Deno.serve(async () => {
     }
 
     // ── Microsoft Teams ───────────────────────────────────────────────────────
-    if ((pref === 'teams' || pref === 'both') && teamsUrl) {
+    // A user's webhook may point to a shared Teams channel, so never include
+    // private tasks in Teams cards.
+    const teamsDueToday = dueToday.filter((t) => t.board?.visibility === 'public')
+    const teamsOverdue = overdue.filter((t) => t.board?.visibility === 'public')
+    if ((pref === 'teams' || pref === 'both') && teamsUrl && (teamsDueToday.length || teamsOverdue.length)) {
       const taskLine = (t: TaskRecord) => ({
         type: 'TextBlock',
         text: `• **${t.title}** — ${t.board?.name ?? ''}${t.priority ? ` · ${t.priority}` : ''}`,
@@ -165,25 +172,25 @@ Deno.serve(async () => {
         },
       ]
 
-      if (dueToday.length > 0) {
+      if (teamsDueToday.length > 0) {
         bodyBlocks.push({
           type: 'TextBlock',
-          text: `🗓️ Due Today (${dueToday.length})`,
+          text: `🗓️ Due Today (${teamsDueToday.length})`,
           weight: 'Bolder',
           spacing: 'Medium',
         })
-        bodyBlocks.push(...dueToday.map(taskLine))
+        bodyBlocks.push(...teamsDueToday.map(taskLine))
       }
 
-      if (overdue.length > 0) {
+      if (teamsOverdue.length > 0) {
         bodyBlocks.push({
           type: 'TextBlock',
-          text: `⚠️ Overdue (${overdue.length})`,
+          text: `⚠️ Overdue (${teamsOverdue.length})`,
           weight: 'Bolder',
           color: 'Attention',
           spacing: 'Medium',
         })
-        bodyBlocks.push(...overdue.slice(0, 10).map((t) => ({
+        bodyBlocks.push(...teamsOverdue.slice(0, 10).map((t) => ({
           type: 'TextBlock',
           text: `• **${t.title}** — due ${t.due_date}`,
           color: 'Attention',
@@ -217,7 +224,7 @@ Deno.serve(async () => {
 
       if (res.ok) {
         teamsSent++
-        console.log(`Teams card sent to ${name}: ${dueToday.length} today, ${overdue.length} overdue`)
+        console.log(`Teams card sent to ${name}: ${teamsDueToday.length} today, ${teamsOverdue.length} overdue`)
       } else {
         const body = await res.text()
         errors.push(`teams:${name}: ${body}`)

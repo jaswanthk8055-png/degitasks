@@ -126,6 +126,9 @@ export default function TopBar({
               {currentBoard?.name || ''}
             </h1>
           )}
+          {currentBoard?.visibility === 'private' && (
+            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap" title="Only you can see this board">🔒 Private</span>
+          )}
           {/* Live indicator */}
           <div className="flex items-center gap-1 flex-shrink-0 ml-1">
             <div

@@ -16,7 +16,7 @@ import { taskPath } from '../../lib/taskLinks'
 
 export default function TaskDetailPanel({ task, onClose, onUpdate }) {
   const { profile } = useAuthStore()
-  const { profiles, memberProfiles, logActivity } = useBoardStore()
+  const { profiles, memberProfiles, logActivity, currentBoard } = useBoardStore()
   const taskId = task?.id
 
   const [descriptionDraft, setDescriptionDraft] = useState(null)
@@ -202,7 +202,7 @@ export default function TaskDetailPanel({ task, onClose, onUpdate }) {
       })
 
       // Notify task creator if they're a different user
-      if (task.created_by && task.created_by !== profile.id) {
+      if (currentBoard?.visibility !== 'private' && task.created_by && task.created_by !== profile.id) {
         await supabase.from('notifications').insert({
           user_id: task.created_by,
           message: `${profile.full_name} commented on "${task.title || 'a task'}"`,

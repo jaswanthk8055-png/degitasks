@@ -1,24 +1,32 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBoardStore } from '../../stores/useBoardStore'
+import { useAuthStore } from '../../stores/useAuthStore'
 import { supabase } from '../../lib/supabase'
 
-const RECENT_KEY = 'taskflow-recent-searches'
 const MAX_RECENT = 5
 
 export default function CommandPalette({ open, onClose }) {
   const navigate = useNavigate()
   const { boards, workspaceId } = useBoardStore()
+  const userId = useAuthStore((s) => s.user?.id)
   const [query, setQuery] = useState('')
-  const [taskCache, setTaskCache] = useState({ workspaceId: null, tasks: [] })
+  const [taskCache, setTaskCache] = useState({ key: null, tasks: [] })
   const [activeIdx, setActiveIdx] = useState(0)
   const [wasOpen, setWasOpen] = useState(open)
-  const [recent, setRecent] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
-  })
+  const [previousUserId, setPreviousUserId] = useState(userId)
+  const [recentByUser, setRecentByUser] = useState({})
   const inputRef = useRef(null)
-  const allTasks = taskCache.workspaceId === workspaceId ? taskCache.tasks : []
-  const loadingTasks = boards.length > 0 && taskCache.workspaceId !== workspaceId
+  const cacheKey = JSON.stringify([userId, workspaceId, boards.map((b) => b.id)])
+  const recent = recentByUser[userId] || []
+  const allTasks = userId && taskCache.key === cacheKey ? taskCache.tasks : []
+  const loadingTasks = !!userId && boards.length > 0 && taskCache.key !== cacheKey
+
+  if (previousUserId !== userId) {
+    setPreviousUserId(userId)
+    setQuery('')
+    setActiveIdx(0)
+  }
 
   // Reset the form for each opening while keeping the workspace task cache.
   if (open !== wasOpen) {
@@ -36,7 +44,7 @@ export default function CommandPalette({ open, onClose }) {
   }, [open])
 
   useEffect(() => {
-    if (!open || boards.length === 0 || taskCache.workspaceId === workspaceId) return
+    if (!open || !userId || boards.length === 0 || taskCache.key === cacheKey) return
     let cancelled = false
     // Fetch all workspace tasks once
     const boardIds = boards.map((b) => b.id)
@@ -45,10 +53,10 @@ export default function CommandPalette({ open, onClose }) {
       .select('id, title, board_id, status, status_color, priority')
       .in('board_id', boardIds)
       .then(({ data }) => {
-        if (!cancelled) setTaskCache({ workspaceId, tasks: data || [] })
+        if (!cancelled) setTaskCache({ key: cacheKey, tasks: data || [] })
       })
     return () => { cancelled = true }
-  }, [open, boards, workspaceId, taskCache.workspaceId])
+  }, [open, boards, userId, cacheKey, taskCache.key])
 
   const trimmedQuery = query.trim().toLowerCase()
   const results = trimmedQuery
@@ -69,8 +77,7 @@ export default function CommandPalette({ open, onClose }) {
 
   const saveRecent = (q) => {
     const next = [q, ...recent.filter((r) => r !== q)].slice(0, MAX_RECENT)
-    setRecent(next)
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+    setRecentByUser((current) => ({ ...current, [userId]: next }))
   }
 
   const handleSelect = (task) => {

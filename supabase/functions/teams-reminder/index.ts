@@ -11,13 +11,15 @@ Deno.serve(async () => {
 
   const { data: dueTasks } = await supabase
     .from('tasks')
-    .select('title, status, assignee:profiles(full_name)')
+    .select('title, status, assignee:profiles!tasks_assignee_id_fkey(full_name), board:boards!inner(visibility)')
+    .eq('board.visibility', 'public')
     .eq('due_date', today)
     .neq('status', 'Done');
 
   const { data: overdueTasks } = await supabase
     .from('tasks')
-    .select('title, due_date, assignee:profiles(full_name)')
+    .select('title, due_date, assignee:profiles!tasks_assignee_id_fkey(full_name), board:boards!inner(visibility)')
+    .eq('board.visibility', 'public')
     .lt('due_date', today)
     .neq('status', 'Done');
 
